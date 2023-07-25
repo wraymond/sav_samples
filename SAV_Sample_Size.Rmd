@@ -1,0 +1,55 @@
+---
+title: "SAV_Sample_Size"
+author: "Wendel Raymond"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+
+theme_set(theme_classic())
+```
+
+
+## Submerged Aquatic Vegitation Sample Size Calculations
+Calcualte sample size needed to detect a 20% difference in SAV counts between two groups. Explore with various power values.
+
+### Dummy data
+Using Wendel's dissertation data from 21 sites in SE Alaska. N=8 0.25 m-sq quadrats. These data are helpful, but its important to consider that real world data will probably be more zero and low number rich. 
+
+```{r}
+eg.dat <- read.csv(url("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/urn%3Auuid%3A5e946e41-4f5f-4499-9969-766f01113971", method = "libcurl"), stringsAsFactors = FALSE, header = TRUE)
+
+eg.dat <- eg.dat %>% 
+  mutate(shoots = eelgrass_shoots_0.25msq + flowering_shoots_0.25msq) %>% 
+  dplyr::select(c(site, quadrat, shoots))
+
+ggplot(eg.dat) +
+  geom_histogram(aes(shoots))
+
+ggplot(eg.dat) +
+  geom_histogram(aes(shoots)) +
+  facet_wrap(~site)
+```
+
+### Simulate data
+Use mean values from WR data to simulate 10000 Poisson data points
+
+```{r}
+sim.dat <- rpois(n = 10000, lambda = mean(eg.dat$shoots))
+
+hist(sim.dat)
+
+mean(sample(eg.dat$shoots, size = 30, replace = TRUE))
+sd(sample(eg.dat$shoots, size = 30, replace = TRUE))
+```
+
+### Calculate sample size
+Calculate sample size needed to detect a 20% change between two groups
+```{r}
+
+```
+

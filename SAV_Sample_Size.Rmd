@@ -21,30 +21,49 @@ Calcualte sample size needed to detect a 20% difference in SAV counts between tw
 Using Wendel's dissertation data from 21 sites in SE Alaska. N=8 0.25 m-sq quadrats. These data are helpful, but its important to consider that real world data will probably be more zero and low number rich. 
 
 ```{r}
-eg.dat <- read.csv(url("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/urn%3Auuid%3A5e946e41-4f5f-4499-9969-766f01113971", method = "libcurl"), stringsAsFactors = FALSE, header = TRUE)
+eg.dat <- read.csv("Puyallup_MSA_Eelgrass.csv", stringsAsFactors = FALSE, header = TRUE)
+```
 
-eg.dat <- eg.dat %>% 
-  mutate(shoots = eelgrass_shoots_0.25msq + flowering_shoots_0.25msq) %>% 
-  dplyr::select(c(site, quadrat, shoots))
+### Summarize data
+```{r}
+eg.sum <- eg.dat %>% 
+  group_by(Tjoin) %>% 
+  summarise(n_samples = n(),
+            n_EG_pres = sum(Eg_PA),
+            mean_EG_dens = mean(Eg_dens, na.rm = TRUE))
 
-ggplot(eg.dat) +
-  geom_histogram(aes(shoots))
-
-ggplot(eg.dat) +
-  geom_histogram(aes(shoots)) +
-  facet_wrap(~site)
+eg.sum$n_EG_dens_orig <- c(4, 0, 3, 2, 0, 1, 2, 2, 1, 0)
+eg.sum$n_to_sim <- eg.sum$n_EG_pres - eg.sum$n_EG_dens_orig
 ```
 
 ### Simulate data
-Use mean values from WR data to simulate 10000 Poisson data points
+Use mean values from each transect
 
 ```{r}
-sim.dat <- rpois(n = 10000, lambda = mean(eg.dat$shoots))
+eg.sim <- data.frame(Tjoin = rep(eg.sum$Tjoin, eg.sum$n_samples))
+eg.sim$rep <- c(1:eg.sum$n_samples[1],
+                1:eg.sum$n_samples[2],
+                1:eg.sum$n_samples[3],
+                1:eg.sum$n_samples[4],
+                1:eg.sum$n_samples[5],
+                1:eg.sum$n_samples[6],
+                1:eg.sum$n_samples[7],
+                1:eg.sum$n_samples[8],
+                1:eg.sum$n_samples[9],
+                1:eg.sum$n_samples[10])
+eg.sim$EG_PA <- eg.dat$Eg_PA
+dens <- order(eg.dat[, c(4, 14)], )
+eg.sim$EG_dens <- sort(eg.dat$Eg_dens)
 
-hist(sim.dat)
+t1 <- rpois(n = eg.sum$n_to_sim[1], lambda = eg.sum$mean_EG_dens[1])
+t2 <- rpois(n = eg.sum$n_to_sim[3], lambda = eg.sum$mean_EG_dens[3])
+t3 <- rpois(n = eg.sum$n_to_sim[4], lambda = eg.sum$mean_EG_dens[4])
+t5 <- rpois(n = eg.sum$n_to_sim[6], lambda = eg.sum$mean_EG_dens[6])
+t6 <- rpois(n = eg.sum$n_to_sim[7], lambda = eg.sum$mean_EG_dens[7])
+t7 <- rpois(n = eg.sum$n_to_sim[8], lambda = mean(eg.sum$mean_EG_dens, na.rm = TRUE))
+t8 <- rpois(n = eg.sum$n_to_sim[9], lambda = mean(eg.sum$mean_EG_dens, na.rm = TRUE))
 
-mean(sample(eg.dat$shoots, size = 30, replace = TRUE))
-sd(sample(eg.dat$shoots, size = 30, replace = TRUE))
+
 ```
 
 ### Calculate sample size

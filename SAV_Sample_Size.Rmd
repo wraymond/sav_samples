@@ -80,12 +80,12 @@ Calculate sample size needed to detect a 20% change between two groups. alpha = 
 mean(eg.sim$EG_dens)
 sd(eg.sim$EG_dens)
 
-(qnorm(0.9) + abs(qnorm(0.1)))^2 * ((2 * sd(eg.sim$EG_dens)) / mean(eg.sim$EG_dens) * 0.8)
+(2*(qnorm(0.9) + qnorm(0.8))^2) * ((sd(eg.sim$EG_dens) / (mean(eg.sim$EG_dens) * 0.2))^2)
 
 ## Eelgrass present ##
 mean(eg.sim$EG_dens[eg.sim$EG_PA == 1])
 sd(eg.sim$EG_dens[eg.sim$EG_PA == 1])
 
-(qnorm(0.9) + abs(qnorm(0.1)))^2 * ((2 * sd(eg.sim$EG_dens[eg.sim$EG_PA == 1])) / mean(eg.sim$EG_dens[eg.sim$EG_PA == 1]) * 0.8)
+(2*(qnorm(0.9) + qnorm(0.8))^2) * ((sd(eg.sim$EG_dens[eg.sim$EG_PA == 1]) / (mean(eg.sim$EG_dens[eg.sim$EG_PA == 1]) * 0.2))^2)
 ```
 

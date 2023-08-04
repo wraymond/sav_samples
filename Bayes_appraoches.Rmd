@@ -1,0 +1,185 @@
+---
+title: "Bayes_approaches"
+author: "Wendel Raymond"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+## Bayesian appraoches to SAV calculations
+Following Hoobs and Hootin texts and code. Bayes Theory Lab from Bayesian Modeling for Ecologists
+
+You are interested in estimating the posterior distribution for the mean number of individuals of an invasive plant species per m2 in a disturbed grassland (or we can think eelgrass shoots). We will call that mean θ (mean shoot density). You have prior information telling you that the average number of these plants per m2 is 10.2 with a standard deviation of the mean = 0.5. You have a set of fifty observations in hand obtained by sweaty labor in the field. Execute the following steps.
+
+### 1 
+Simulate 50 data points form a Poisson wuth mean 6.4. We are calling this our example data. 
+```{r}
+set.seed(10)
+
+y <- rpois(50, 6.4)
+```
+
+### 2 - 3 
+Plot
+```{r}
+hist(y, freq = FALSE, breaks = 10)
+
+mu.prior <- 10.2
+sigma.prior <- 0.5
+```
+
+```{r}
+discrete_hist <- function(y) {
+  
+  z <- data.frame(y) %>% count(y) %>% mutate(prop = prop.table(n))
+  plot(z$y, z$prop, type = "h", ylab = "Probability", xlab = "y", main = "Improved histogram of data", 
+  frame = T, xaxt = "n", lwd = 3, col = "blue")
+  x <- seq(min(z$y), max(z$y), 1)
+  axis(side = 1, at = x, labels = x)
+
+}
+
+discrete_hist(y)
+```
+
+
+### 4
+Set up a vector containing a sequence of values for θ, the mean number of invasive plants
+```{r}
+step <- 0.01
+theta <- seq(0, 15, step)
+```
+
+### 5 - 6
+Write the mathematical expression for a gamma prior on θ
+```{r}
+prior <- function(theta, mu = mu.prior, sigma = sigma.prior) dgamma(theta, mu^2 / sigma^2, mu / sigma^2)
+
+plot(theta, prior(theta = theta, 10.2, 0.5))
+```
+
+### 8 - 9
+What is the mathematical expression for the likelihood [y∣θ] assuming that the data are conditionally independent?
+```{r}
+like <- function(theta, y){
+  L = rep(0, length(theta))
+  for(i in 1:length(theta)) L[i] = prod(dpois(y, theta[i], log = FALSE))
+  return(L)
+}
+```
+
+```{r}
+plot(theta, like(theta, y = y), type = "l", xlim = c(5, 15), main = "Likelihood", xlab = expression(theta), 
+  ylab = expression(paste("[y|", theta, "]")))
+```
+
+### 10
+What is the mathematical expression for the joint distribution [θ,y]?
+```{r}
+joint = function(theta) like(theta, y = y) * prior(theta)
+
+plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(5, 15), xlab = expression(theta),
+  ylab = expression(paste("[y|", theta, "] x [", theta, "]")))
+```
+
+### 11
+What is the mathematical expression for the marginal probability of the data [y]?
+```{r}
+Py <- sum(like(theta, y = y) * prior(theta) * step)
+```
+
+### 12
+What is the mathematical expression for the posterior distribution [θ∣y]? 
+```{r}
+p.theta <- joint(theta) / Py
+
+plot(theta, p.theta, typ = "l", xlim = c(5, 15), main = "Posterior", xlab = expression(theta), 
+  ylab = expression(paste("[ ", theta, " | y]")))
+```
+
+```{r}
+par(mfrow = (c(2, 3)))
+plot(theta, prior(theta), type = "l", ylab = expression(paste("[", theta, "]")), xlab = expression(theta),
+  main = "Prior", xlim = c(5, 15))
+
+hist(y, freq = FALSE, breaks = 10, main = "Histogram of data")
+discrete_hist(y = y)
+
+plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlim = c(5, 15), xlab = expression(theta),
+  ylab = expression(paste("[y|", theta, "])")))
+plot(theta, joint(theta), type = "l", main = "Joint", xlim = c(5, 15), xlab = expression(theta),
+  ylab = expression(paste("[y | ", theta, "]) x [", theta, "]")))
+plot(theta, p.theta, type = "l", xlim = c(5, 15), main = "Posterior", xlab = expression(theta),
+  ylab = expression(paste("[ ", theta, " | y]")))
+```
+
+### 14
+```{r}
+(c <- max(p.theta) / max(like(theta, y)))
+
+like.scaled <- c * like(theta, y)
+
+par(mfrow=c(1, 1))
+plot(theta, like.scaled, type = "l", col = "red", xlim = c(5, 15), xlab = expression(theta),
+  main = "Scaled Overlay", ylab = "Probability density")
+lines(theta, p.theta, type = "l")
+lines(theta, prior(theta), col = "blue")
+legend(11, 1, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
+```
+
+### More real eelgrass example
+
+#### Data
+```{r}
+## Prior data from preliminary sampling ##
+mu.prior <- 5.04
+sigma.prior <- 10.73
+
+## New sampled data ##
+y <- rpois(50, mu.prior)
+```
+
+#### Parameters and probabilities
+```{r}
+## Theta: mean number of shoots ##
+step <- 0.1
+theta <- seq(0, 25, step)
+
+## Prior distribution ##
+prior <- function(theta, mu = mu.prior, sigma = sigma.prior) dgamma(theta, mu^2 / sigma^2, mu / sigma^2)
+
+## Liklihood: probability of theta given the data ##
+like <- function(theta, y){
+  L = rep(0, length(theta))
+  for(i in 1:length(theta)) L[i] = prod(dpois(y, theta[i], log = FALSE))
+  return(L)
+}
+
+## Joint ##
+joint <- function(theta) like(theta, y = y) * prior(theta)
+
+## Marginal probability ##
+Py <- sum(like(theta, y = y) * prior(theta) * step, na.rm = TRUE)
+
+## Posterior ##
+p.theta <- joint(theta) / Py
+```
+
+#### Plots
+```{r}
+par(mfrow = (c(2, 3)))
+
+plot(theta, prior(theta), type = "l", ylab = expression(paste("[", theta, "]")), xlab = expression(theta),
+  main = "Prior")
+
+hist(y, freq = FALSE, breaks = 10, main = "Histogram of data")
+
+discrete_hist(y = y)
+
+plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlab = expression(theta), ylab = expression(paste("[y|", theta, "])")))
+
+plot(theta, joint(theta), type = "l", main = "Joint", xlab = expression(theta), ylab = expression(paste("[y | ", theta, "]) x [", theta, "]")))
+
+plot(theta, p.theta, type = "l", main = "Posterior", xlab = expression(theta), ylab = expression(paste("[ ", theta, " | y]")))
+```
+

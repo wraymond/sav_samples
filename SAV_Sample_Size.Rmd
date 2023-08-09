@@ -85,6 +85,8 @@ sd(eg.sim$EG_dens)
 ## Ilai's transformation ##
 (abs((8/0.04) * qnorm(0.1))) * (sd(eg.sim$EG_dens) / mean(eg.sim$EG_dens)^2)
 
+(abs((8/0.04) * qnorm(0.1))) * (2 / 5.04)
+
 ## Eelgrass present ##
 mean(eg.sim$EG_dens[eg.sim$EG_PA == 1])
 sd(eg.sim$EG_dens[eg.sim$EG_PA == 1])

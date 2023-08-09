@@ -136,7 +136,7 @@ mu.prior <- 5.04
 sigma.prior <- 10.73
 
 ## New sampled data ##
-y <- rpois(50, mu.prior)
+y <- rpois(20, mu.prior)
 ```
 
 #### Parameters and probabilities
@@ -167,6 +167,7 @@ p.theta <- joint(theta) / Py
 
 #### Plots
 ```{r}
+## Grid ##
 par(mfrow = (c(2, 3)))
 
 plot(theta, prior(theta), type = "l", ylab = expression(paste("[", theta, "]")), xlab = expression(theta),
@@ -181,5 +182,34 @@ plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlab = expressi
 plot(theta, joint(theta), type = "l", main = "Joint", xlab = expression(theta), ylab = expression(paste("[y | ", theta, "]) x [", theta, "]")))
 
 plot(theta, p.theta, type = "l", main = "Posterior", xlab = expression(theta), ylab = expression(paste("[ ", theta, " | y]")))
+
+p.theta <- joint(theta) / Py
+
+plot(theta, p.theta, typ = "l", xlim = c(5, 15), main = "Posterior", xlab = expression(theta), 
+  ylab = expression(paste("[ ", theta, " | y]")))
+
+## Single overlay ##
+(c <- max(p.theta, na.rm = TRUE) / max(like(theta, y), na.rm = TRUE))
+
+like.scaled <- c * like(theta, y)
+
+par(mfrow=c(1, 1))
+plot(theta, like.scaled, type = "l", col = "red", xlim = c(0, 15), xlab = expression(theta),
+  main = "Scaled Overlay", ylab = "Probability density")
+lines(theta, p.theta, type = "l")
+lines(theta, prior(theta), col = "blue")
+legend(9, 0.5, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
+```
+
+### Bayes Factor and Bayesian t-tests
+
+```{r}
+## Simulate data ##
+sim.dat <- data.frame(sample = c(rep("Pre", 30), rep("Post", 30)),
+                      shoots = c(rpois(30, 30), rpois(30, 24)))
+
+library(BayesFactor)
+
+ttestBF(formula = shoots ~ sample, data = sim.dat)
 ```
 

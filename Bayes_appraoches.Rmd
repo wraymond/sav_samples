@@ -6,13 +6,18 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
+```{r}
+library(tidyverse)
+```
+
+
 ## Bayesian appraoches to SAV calculations
 Following Hoobs and Hootin texts and code. Bayes Theory Lab from Bayesian Modeling for Ecologists
 
 You are interested in estimating the posterior distribution for the mean number of individuals of an invasive plant species per m2 in a disturbed grassland (or we can think eelgrass shoots). We will call that mean θ (mean shoot density). You have prior information telling you that the average number of these plants per m2 is 10.2 with a standard deviation of the mean = 0.5. You have a set of fifty observations in hand obtained by sweaty labor in the field. Execute the following steps.
 
 ### 1 
-Simulate 50 data points form a Poisson wuth mean 6.4. We are calling this our example data. 
+Simulate 50 data points form a Poisson with mean 6.4. We are calling this our example data. 
 ```{r}
 set.seed(10)
 
@@ -55,7 +60,7 @@ Write the mathematical expression for a gamma prior on θ
 ```{r}
 prior <- function(theta, mu = mu.prior, sigma = sigma.prior) dgamma(theta, mu^2 / sigma^2, mu / sigma^2)
 
-plot(theta, prior(theta = theta, 10.2, 0.5))
+plot(theta, prior(theta = theta, mu.prior, sigma.prior))
 ```
 
 ### 8 - 9
@@ -69,16 +74,16 @@ like <- function(theta, y){
 ```
 
 ```{r}
-plot(theta, like(theta, y = y), type = "l", xlim = c(5, 15), main = "Likelihood", xlab = expression(theta), 
+plot(theta, like(theta, y = y), type = "l", xlim = c(0, 15), main = "Likelihood", xlab = expression(theta), 
   ylab = expression(paste("[y|", theta, "]")))
 ```
 
 ### 10
 What is the mathematical expression for the joint distribution [θ,y]?
 ```{r}
-joint = function(theta) like(theta, y = y) * prior(theta)
+joint <- function(theta) like(theta, y = y) * prior(theta)
 
-plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(5, 15), xlab = expression(theta),
+plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(0, 15), xlab = expression(theta),
   ylab = expression(paste("[y|", theta, "] x [", theta, "]")))
 ```
 
@@ -93,23 +98,23 @@ What is the mathematical expression for the posterior distribution [θ∣y]?
 ```{r}
 p.theta <- joint(theta) / Py
 
-plot(theta, p.theta, typ = "l", xlim = c(5, 15), main = "Posterior", xlab = expression(theta), 
+plot(theta, p.theta, typ = "l", xlim = c(0, 15), main = "Posterior", xlab = expression(theta), 
   ylab = expression(paste("[ ", theta, " | y]")))
 ```
 
 ```{r}
 par(mfrow = (c(2, 3)))
 plot(theta, prior(theta), type = "l", ylab = expression(paste("[", theta, "]")), xlab = expression(theta),
-  main = "Prior", xlim = c(5, 15))
+  main = "Prior", xlim = c(0, 15))
 
 hist(y, freq = FALSE, breaks = 10, main = "Histogram of data")
 discrete_hist(y = y)
 
-plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlim = c(5, 15), xlab = expression(theta),
+plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlim = c(0, 15), xlab = expression(theta),
   ylab = expression(paste("[y|", theta, "])")))
-plot(theta, joint(theta), type = "l", main = "Joint", xlim = c(5, 15), xlab = expression(theta),
+plot(theta, joint(theta), type = "l", main = "Joint", xlim = c(0, 15), xlab = expression(theta),
   ylab = expression(paste("[y | ", theta, "]) x [", theta, "]")))
-plot(theta, p.theta, type = "l", xlim = c(5, 15), main = "Posterior", xlab = expression(theta),
+plot(theta, p.theta, type = "l", xlim = c(0, 15), main = "Posterior", xlab = expression(theta),
   ylab = expression(paste("[ ", theta, " | y]")))
 ```
 
@@ -120,11 +125,11 @@ plot(theta, p.theta, type = "l", xlim = c(5, 15), main = "Posterior", xlab = exp
 like.scaled <- c * like(theta, y)
 
 par(mfrow=c(1, 1))
-plot(theta, like.scaled, type = "l", col = "red", xlim = c(5, 15), xlab = expression(theta),
+plot(theta, like.scaled, type = "l", col = "red", xlim = c(0, 15), xlab = expression(theta),
   main = "Scaled Overlay", ylab = "Probability density")
 lines(theta, p.theta, type = "l")
 lines(theta, prior(theta), col = "blue")
-legend(11, 1, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
+legend(0, 1, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
 ```
 
 ### More real eelgrass example
@@ -132,21 +137,22 @@ legend(11, 1, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3),
 #### Data
 ```{r}
 ## Prior data from preliminary sampling ##
-mu.prior <- 5.04
-sigma.prior <- 10.73
+mu.prior <- 20
+sigma.prior <- 10
 
 ## New sampled data ##
-y <- rpois(20, mu.prior)
+y <- rpois(50, 18)
 ```
 
 #### Parameters and probabilities
 ```{r}
 ## Theta: mean number of shoots ##
 step <- 0.1
-theta <- seq(0, 25, step)
+theta <- seq(0, 40, step)
 
 ## Prior distribution ##
 prior <- function(theta, mu = mu.prior, sigma = sigma.prior) dgamma(theta, mu^2 / sigma^2, mu / sigma^2)
+plot(theta, prior(theta = theta, mu.prior, sigma.prior))
 
 ## Liklihood: probability of theta given the data ##
 like <- function(theta, y){
@@ -155,14 +161,21 @@ like <- function(theta, y){
   return(L)
 }
 
+plot(theta, like(theta, y = y), type = "l", xlim = c(0, 15), main = "Likelihood", xlab = expression(theta), 
+  ylab = expression(paste("[y|", theta, "]")))
+
 ## Joint ##
 joint <- function(theta) like(theta, y = y) * prior(theta)
+plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(0, 15), xlab = expression(theta),
+  ylab = expression(paste("[y|", theta, "] x [", theta, "]")))
 
 ## Marginal probability ##
 Py <- sum(like(theta, y = y) * prior(theta) * step, na.rm = TRUE)
 
 ## Posterior ##
 p.theta <- joint(theta) / Py
+plot(theta, p.theta, typ = "l", xlim = c(0, 15), main = "Posterior", xlab = expression(theta), 
+  ylab = expression(paste("[ ", theta, " | y]")))
 ```
 
 #### Plots
@@ -183,22 +196,17 @@ plot(theta, joint(theta), type = "l", main = "Joint", xlab = expression(theta), 
 
 plot(theta, p.theta, type = "l", main = "Posterior", xlab = expression(theta), ylab = expression(paste("[ ", theta, " | y]")))
 
-p.theta <- joint(theta) / Py
-
-plot(theta, p.theta, typ = "l", xlim = c(5, 15), main = "Posterior", xlab = expression(theta), 
-  ylab = expression(paste("[ ", theta, " | y]")))
-
 ## Single overlay ##
 (c <- max(p.theta, na.rm = TRUE) / max(like(theta, y), na.rm = TRUE))
 
 like.scaled <- c * like(theta, y)
 
 par(mfrow=c(1, 1))
-plot(theta, like.scaled, type = "l", col = "red", xlim = c(0, 15), xlab = expression(theta),
+plot(theta, like.scaled, type = "l", col = "red", xlim = c(0, 40), xlab = expression(theta),
   main = "Scaled Overlay", ylab = "Probability density")
 lines(theta, p.theta, type = "l")
 lines(theta, prior(theta), col = "blue")
-legend(9, 0.5, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
+legend(2, 0.6, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
 ```
 
 ### Bayes Factor and Bayesian t-tests

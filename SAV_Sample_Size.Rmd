@@ -34,6 +34,8 @@ eg.sum <- eg.dat %>%
 
 eg.sum$n_EG_dens_orig <- c(4, 0, 3, 2, 0, 1, 2, 2, 1, 0)
 eg.sum$n_to_sim <- eg.sum$n_EG_pres - eg.sum$n_EG_dens_orig
+
+hist(eg.dat$Eg_dens[eg.dat$Eg_PA == 1], breaks = 10)
 ```
 
 ### Simulate data
@@ -87,6 +89,25 @@ sd(eg.sim$EG_dens)
 
 (abs((8/0.04) * qnorm(0.1))) * (2 / 5.04)
 
+n.star.pois <- function(mean) {
+  (abs((8/0.04) * qnorm(0.1))) * ((2 / mean))
+}
+
+n.star.gaus <- function(mean, sd) {
+  (abs((8/0.04) * qnorm(0.1))) * ((sd / mean^2))
+}
+
+n.star.pois(1200)
+n.star.gaus(5.13597, 10.8)
+
+n.star.dat <- data.frame(mean = seq(0.5, 60, by = 0.5))
+n.star.dat$sd <- n.star.dat$mean * 0.5
+n.star.dat$n.pois <- n.star.pois(n.star.dat$mean)
+n.star.dat$n.gaus <- n.star.gaus(n.star.dat$mean, n.star.dat$sd)
+
+ggplot(n.star.dat) +
+  geom_line(aes(x = mean, y))
+
 ## Eelgrass present ##
 mean(eg.sim$EG_dens[eg.sim$EG_PA == 1])
 sd(eg.sim$EG_dens[eg.sim$EG_PA == 1])
@@ -96,4 +117,21 @@ sd(eg.sim$EG_dens[eg.sim$EG_PA == 1])
 ## Ilai's transformation ##
 (abs((8/0.04) * qnorm(0.1))) * (sd(eg.sim$EG_dens[eg.sim$EG_PA == 1]) / mean(eg.sim$EG_dens[eg.sim$EG_PA == 1])^2)
 ```
+
+### Complete example
+With inspiration from above Puyallup data
+
+```{r}
+## Simulate data ##
+pre <- rpois(110, 5.1)
+post.same <- rpois(110, 5.1)
+post.diff <- rpois(110, 3.5)
+post.diff20 <- rpois(110, 3.9) # example where loss is just over 20%
+
+## Test ##
+t.test(post.same, pre, alternative = "less")
+t.test(post.diff, pre, alternative = "less")
+t.test(post.diff20, pre, alternative = "less")
+```
+
 

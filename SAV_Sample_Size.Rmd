@@ -126,7 +126,7 @@ With inspiration from above Puyallup data
 pre <- rpois(110, 5.1)
 post.same <- rpois(110, 5.1)
 post.diff <- rpois(110, 3.5)
-post.diff20 <- rpois(110, 3.9) # example where loss is just over 20%
+post.diff20 <- rpois(110, 4.5) # example where loss is just over 20%
 
 ## Test ##
 t.test(post.same, pre, alternative = "less")

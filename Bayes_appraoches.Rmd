@@ -8,20 +8,21 @@ editor_options:
 ---
 ```{r}
 library(tidyverse)
+library(HDInterval)
 ```
 
 
 ## Bayesian appraoches to SAV calculations
-Following Hoobs and Hootin texts and code. Bayes Theory Lab from Bayesian Modeling for Ecologists
+Following Hobbs and Hooten texts and code. Bayes Theorem Lab from Bayesian Modeling for Ecologists
 
-You are interested in estimating the posterior distribution for the mean number of individuals of an invasive plant species per m2 in a disturbed grassland (or we can think eelgrass shoots). We will call that mean θ (mean shoot density). You have prior information telling you that the average number of these plants per m2 is 10.2 with a standard deviation of the mean = 0.5. You have a set of fifty observations in hand obtained by sweaty labor in the field. Execute the following steps.
+You are interested in estimating the posterior distribution for the mean number of individuals of an invasive plant species per m2 in a disturbed grassland (or we can think eelgrass shoots). We will call that mean θ (mean shoot density). You have prior information telling you that the average number of these plants per m2 is 10.2 with a standard deviation of the mean = 0.5. You have a set of fifty observations in hand obtained by sweaty (underwater) labor in the field. Execute the following steps.
 
 ### 1 
-Simulate 50 data points form a Poisson with mean 6.4. We are calling this our example data. 
+Simulate 50 data points form a Poisson with mean 7.5. We are calling this our example data. 
 ```{r}
 set.seed(10)
 
-y <- rpois(50, 6.4)
+y <- rpois(50, 7.5)
 ```
 
 ### 2 - 3 
@@ -49,10 +50,12 @@ discrete_hist(y)
 
 
 ### 4
-Set up a vector containing a sequence of values for θ, the mean number of invasive plants
+Set up a vector containing a sequence of values for θ, the mean number of invasive (eelgrass shoots) plants.
+
+This where I get a little iffy in that the upper bound here seems to be set arbitrarily, but lets go with it for now.
 ```{r}
 step <- 0.01
-theta <- seq(0, 15, step)
+theta <- seq(0, 20, step)
 ```
 
 ### 5 - 6
@@ -74,7 +77,7 @@ like <- function(theta, y){
 ```
 
 ```{r}
-plot(theta, like(theta, y = y), type = "l", xlim = c(0, 15), main = "Likelihood", xlab = expression(theta), 
+plot(theta, like(theta, y = y), type = "l", xlim = c(0, 20), main = "Likelihood", xlab = expression(theta), 
   ylab = expression(paste("[y|", theta, "]")))
 ```
 
@@ -83,7 +86,7 @@ What is the mathematical expression for the joint distribution [θ,y]?
 ```{r}
 joint <- function(theta) like(theta, y = y) * prior(theta)
 
-plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(0, 15), xlab = expression(theta),
+plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(0, 20), xlab = expression(theta),
   ylab = expression(paste("[y|", theta, "] x [", theta, "]")))
 ```
 
@@ -98,23 +101,23 @@ What is the mathematical expression for the posterior distribution [θ∣y]?
 ```{r}
 p.theta <- joint(theta) / Py
 
-plot(theta, p.theta, typ = "l", xlim = c(0, 15), main = "Posterior", xlab = expression(theta), 
+plot(theta, p.theta, typ = "l", xlim = c(0, 20), main = "Posterior", xlab = expression(theta), 
   ylab = expression(paste("[ ", theta, " | y]")))
 ```
 
 ```{r}
 par(mfrow = (c(2, 3)))
 plot(theta, prior(theta), type = "l", ylab = expression(paste("[", theta, "]")), xlab = expression(theta),
-  main = "Prior", xlim = c(0, 15))
+  main = "Prior", xlim = c(0, 20))
 
 hist(y, freq = FALSE, breaks = 10, main = "Histogram of data")
 discrete_hist(y = y)
 
-plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlim = c(0, 15), xlab = expression(theta),
+plot(theta, like(theta, y = y), type = "l", main = "Likelihood", xlim = c(0, 20), xlab = expression(theta),
   ylab = expression(paste("[y|", theta, "])")))
-plot(theta, joint(theta), type = "l", main = "Joint", xlim = c(0, 15), xlab = expression(theta),
+plot(theta, joint(theta), type = "l", main = "Joint", xlim = c(0, 20), xlab = expression(theta),
   ylab = expression(paste("[y | ", theta, "]) x [", theta, "]")))
-plot(theta, p.theta, type = "l", xlim = c(0, 15), main = "Posterior", xlab = expression(theta),
+plot(theta, p.theta, type = "l", xlim = c(0, 20), main = "Posterior", xlab = expression(theta),
   ylab = expression(paste("[ ", theta, " | y]")))
 ```
 
@@ -132,7 +135,7 @@ lines(theta, prior(theta), col = "blue")
 legend(0, 1, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
 ```
 
-### More real eelgrass example
+### More realistic eelgrass example
 
 #### Data
 ```{r}
@@ -140,8 +143,8 @@ legend(0, 1, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), 
 mu.prior <- 20
 sigma.prior <- 10
 
-## New sampled data ##
-y <- rpois(50, 18)
+## simulated new sampled data (e.g. 1 year post construction) ##
+y <- rpois(50, 10)
 ```
 
 #### Parameters and probabilities
@@ -161,12 +164,12 @@ like <- function(theta, y){
   return(L)
 }
 
-plot(theta, like(theta, y = y), type = "l", xlim = c(0, 15), main = "Likelihood", xlab = expression(theta), 
+plot(theta, like(theta, y = y), type = "l", xlim = c(0, 20), main = "Likelihood", xlab = expression(theta), 
   ylab = expression(paste("[y|", theta, "]")))
 
 ## Joint ##
 joint <- function(theta) like(theta, y = y) * prior(theta)
-plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(0, 15), xlab = expression(theta),
+plot(theta, joint(theta), type = "l",  main = "Joint", xlim = c(0, 20), xlab = expression(theta),
   ylab = expression(paste("[y|", theta, "] x [", theta, "]")))
 
 ## Marginal probability ##
@@ -174,7 +177,7 @@ Py <- sum(like(theta, y = y) * prior(theta) * step, na.rm = TRUE)
 
 ## Posterior ##
 p.theta <- joint(theta) / Py
-plot(theta, p.theta, typ = "l", xlim = c(0, 15), main = "Posterior", xlab = expression(theta), 
+plot(theta, p.theta, typ = "l", xlim = c(0, 20), main = "Posterior", xlab = expression(theta), 
   ylab = expression(paste("[ ", theta, " | y]")))
 ```
 
@@ -208,16 +211,3 @@ lines(theta, p.theta, type = "l")
 lines(theta, prior(theta), col = "blue")
 legend(2, 0.6, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
 ```
-
-### Bayes Factor and Bayesian t-tests
-
-```{r}
-## Simulate data ##
-sim.dat <- data.frame(sample = c(rep("Pre", 30), rep("Post", 30)),
-                      shoots = c(rpois(30, 30), rpois(30, 24)))
-
-library(BayesFactor)
-
-ttestBF(formula = shoots ~ sample, data = sim.dat)
-```
-

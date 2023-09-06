@@ -9,6 +9,7 @@ editor_options:
 ```{r}
 library(tidyverse)
 library(HDInterval)
+library(BayesFactor)
 ```
 
 
@@ -211,3 +212,24 @@ lines(theta, p.theta, type = "l")
 lines(theta, prior(theta), col = "blue")
 legend(2, 0.6, c("Scaled likelihood","Posterior", "Prior"), lty = rep("solid",3), col = c("red", "black", "blue"))
 ```
+
+### With rmBayes
+
+#### Simulate data
+```{r}
+dat <- data.frame(time = c(rep("init", 30), rep("yr1", 30)),
+                  shoots = c(rpois(30, 20), rpois(30, 10)))
+
+mu_init <- mean(dat$shoots[dat$time=="init"])
+sigma_inti <- sd(dat$shoots[dat$time=="init"])
+mu_yr1 <- mean(dat$shoots[dat$time=="yr1"])
+sigma_yr1 <- sd(dat$shoots[dat$time=="yr1"])
+```
+
+#### Using BayesFactor
+```{r}
+bf_rmanova <- anovaBF(shoots ~ time, whichRandom = "time", data = dat)
+bf_rmanova
+```
+
+

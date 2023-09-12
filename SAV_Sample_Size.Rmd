@@ -17,8 +17,7 @@ theme_set(theme_classic())
 ## Submerged Aquatic Vegitation Sample Size Calculations
 Calcualte sample size needed to detect a 20% difference in SAV counts between two groups. Explore with various power values.
 
-### Dummy data
-Using Wendel's dissertation data from 21 sites in SE Alaska. N=8 0.25 m-sq quadrats. These data are helpful, but its important to consider that real world data will probably be more zero and low number rich. 
+### Data
 
 ```{r}
 eg.dat <- read.csv("Puyallup_MSA_Eelgrass.csv", stringsAsFactors = FALSE, header = TRUE)

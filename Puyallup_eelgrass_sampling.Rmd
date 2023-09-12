@@ -1,0 +1,164 @@
+---
+title: "Puyallup_eelgrass_sampling"
+author: "Wendel Raymond"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Puyallup eelgrass sampling
+Use data provided by Marine Surveys and Assessments (MSA) to calculate sample size needed to detect change in eelgrass density post-impact.
+
+### Data
+Read in raw survey data provided by MSA. Where rows are sampling instances. Column of interest 'Transect', 'Tjoin', 'RawDepth', 'FtMLLW', 'Eg_PA', and 'Eg_dens'.
+
+```{r}
+eg.dat <- read.csv("Puyallup_MSA_Eelgrass.csv", stringsAsFactors = FALSE, header = TRUE)
+```
+
+### Inspect data
+Summarize data by transect to produce the number of sample instances, the number of sampling instances when eelgrass was present, and mean density when eelgrass was directly measured.
+
+**Note from original** the information in columns 'RawDepth' and 'FtMLLW' was not totally understood in the first calculation of these data. One could argue that when depth is much above the intertidal range, then eelgrass will never be present and therefore is not really a fair sampling instance. Moving forward, calculations will be made following the original path (A) and again excluding these data (B).
+
+```{r}
+eg.sum.a <- eg.dat %>% 
+  group_by(Tjoin) %>% 
+  summarise(n_samples = n(), # number of sample instances
+            n_EG_pres = sum(Eg_PA), # sum the sample instances when eeglrass was present
+            mean_EG_dens = mean(Eg_dens, na.rm = TRUE)) # mean eelgrass when it was directly measured
+
+eg.sum.b <- eg.dat %>% 
+  filter(!is.na(FtMLLW)) %>% # filter out sample instances that were high intertidal (no eelgrass ever)
+  group_by(Tjoin) %>% 
+  summarise(n_samples = n(),
+            n_EG_pres = sum(Eg_PA),
+            mean_EG_dens = mean(Eg_dens, na.rm = TRUE))
+```
+
+To these summaries, add a column that counts the number of sample instances when eelgrass was actually directly measured in the field and a column the computes the number of sample instances where one could simulate the density of eelgrass when it was not measured. 
+
+```{r}
+## n eeglrass measures
+eg.sum.a$n_EG_dens_orig <- c(4, 0, 3, 2, 0, 1, 2, 2, 1, 0)
+eg.sum.b$n_EG_dens_orig <- c(4, 0, 3, 2, 0, 1, 2, 2, 1, 0)
+
+## n to simulate ##
+eg.sum.a$n_to_sim <- eg.sum.a$n_EG_pres - eg.sum.a$n_EG_dens_orig
+eg.sum.b$n_to_sim <- eg.sum.b$n_EG_pres - eg.sum.b$n_EG_dens_orig
+```
+
+### Simulate data
+Use mean shoot counts from each transect to simulate eelgrass shoot counts for each sampling instances where eelgrass was noted as present but was not directly measured.
+
+Why are we simulating in the first place? We are simulating data in order in increase the overall and per-transect sample size. Otherwise, sample size of directly measured eelgrass density is rather low. See column 'n_EG_dens_orig' in eg.sum.a/b.
+
+**Important** run this before any simulation. This will ensure the same results across users
+```{r}
+set.seed(123)
+```
+
+
+#### A Data
+Simulate for situation A where high intertidal rows are included
+```{r}
+## Create dataframe to hold simualted data ##
+eg.sim.a <- data.frame(Tjoin = rep(eg.sum.a$Tjoin, eg.sum.a$n_samples))
+
+# specify how many sample instances for each transect 
+eg.sim.a$rep <- c(1:eg.sum.a$n_samples[1],
+                1:eg.sum.a$n_samples[2],
+                1:eg.sum.a$n_samples[3],
+                1:eg.sum.a$n_samples[4],
+                1:eg.sum.a$n_samples[5],
+                1:eg.sum.a$n_samples[6],
+                1:eg.sum.a$n_samples[7],
+                1:eg.sum.a$n_samples[8],
+                1:eg.sum.a$n_samples[9],
+                1:eg.sum.a$n_samples[10])
+
+## Simulate data ##
+t1 <- rpois(n = eg.sum.a$n_to_sim[1], lambda = eg.sum.a$mean_EG_dens[1])
+t2 <- rpois(n = eg.sum.a$n_to_sim[3], lambda = eg.sum.a$mean_EG_dens[3])
+t3 <- rpois(n = eg.sum.a$n_to_sim[4], lambda = eg.sum.a$mean_EG_dens[4])
+t5 <- rpois(n = eg.sum.a$n_to_sim[6], lambda = eg.sum.a$mean_EG_dens[6])
+t6 <- rpois(n = eg.sum.a$n_to_sim[7], lambda = eg.sum.a$mean_EG_dens[7])
+t7 <- rpois(n = eg.sum.a$n_to_sim[8], lambda = mean(eg.sum.a$mean_EG_dens, na.rm = TRUE))
+t8 <- rpois(n = eg.sum.a$n_to_sim[9], lambda = mean(eg.sum.a$mean_EG_dens, na.rm = TRUE))
+
+# manually add back in original data to simulated data 
+eg.sim.a$EG_dens <- NA
+eg.sim.a[1:23, 3] <- c(37.33, 37.33, 37.33, 0, t1, 0, 0, 0, 0, 0 ,0 ,0, 0, 0, 0)
+eg.sim.a[24:41, 3] <- rep(0, 18) # no eelgrass was present
+eg.sim.a[42:63, 3] <- c(53.33, 0, 26.67, t2, rep(0, 11))
+eg.sim.a[64:85, 3] <- c(0, 16, t3, rep(0, 15))
+eg.sim.a[86:102, 3] <- rep(0, 17) # no eelgrass was present
+eg.sim.a[103:123, 3] <- c(10.67, t5, rep(0, 17))
+eg.sim.a[124:145, 3] <- c(42.67, 0, t6, rep(0, 15))
+eg.sim.a[146:165, 3] <- c(t7, rep(0, 15))
+eg.sim.a[166:184, 3] <- c(t8, rep(0, 16))
+eg.sim.a[185:201, 3] <- rep(0, 17) # no eelgrass was present
+```
+
+#### B Data
+Simulate for situation B where high intertidal rows are excluded
+```{r}
+## Create dataframe to hold simualted data ##
+eg.sim.b <- data.frame(Tjoin = rep(eg.sum.b$Tjoin, eg.sum.b$n_samples))
+
+# specify how many sample instances for each transect 
+eg.sim.b$rep <- c(1:eg.sum.b$n_samples[1],
+                1:eg.sum.b$n_samples[2],
+                1:eg.sum.b$n_samples[3],
+                1:eg.sum.b$n_samples[4],
+                1:eg.sum.b$n_samples[5],
+                1:eg.sum.b$n_samples[6],
+                1:eg.sum.b$n_samples[7],
+                1:eg.sum.b$n_samples[8],
+                1:eg.sum.b$n_samples[9],
+                1:eg.sum.b$n_samples[10])
+
+## Simulate data ##
+t1 <- rpois(n = eg.sum.b$n_to_sim[1], lambda = eg.sum.b$mean_EG_dens[1])
+t2 <- rpois(n = eg.sum.b$n_to_sim[3], lambda = eg.sum.b$mean_EG_dens[3])
+t3 <- rpois(n = eg.sum.b$n_to_sim[4], lambda = eg.sum.b$mean_EG_dens[4])
+t5 <- rpois(n = eg.sum.b$n_to_sim[6], lambda = eg.sum.b$mean_EG_dens[6])
+t6 <- rpois(n = eg.sum.b$n_to_sim[7], lambda = eg.sum.b$mean_EG_dens[7])
+t7 <- rpois(n = eg.sum.b$n_to_sim[8], lambda = mean(eg.sum.b$mean_EG_dens, na.rm = TRUE))
+t8 <- rpois(n = eg.sum.b$n_to_sim[9], lambda = mean(eg.sum.b$mean_EG_dens, na.rm = TRUE))
+
+# manually add back in original data to simulated data 
+eg.sim.b$EG_dens <- NA
+eg.sim.b[1:22, 3] <- c(37.33, 37.33, 37.33, 0, t1, 0, 0, 0, 0, 0 ,0 ,0, 0, 0)
+eg.sim.b[23:40, 3] <- rep(0, 18) # no eelgrass was present
+eg.sim.b[41:60, 3] <- c(53.33, 0, 26.67, t2, rep(0, 9))
+eg.sim.b[61:79, 3] <- c(0, 16, t3, rep(0, 12))
+eg.sim.b[80:93, 3] <- rep(0, 14) # no eelgrass was present
+eg.sim.b[94:111, 3] <- c(10.67, t5, rep(0, 14))
+eg.sim.b[112:130, 3] <- c(42.67, 0, t6, rep(0, 12))
+eg.sim.b[131:150, 3] <- c(t7, rep(0, 15))
+eg.sim.b[151:169, 3] <- c(t8, rep(0, 16))
+eg.sim.b[170:186, 3] <- rep(0, 17) # no eelgrass was present
+```
+
+### Calculate sample size
+We use a formula what assumes alpha = 0.1 and beta = 0.9 and is derived from the equation N = 2(Z_alpha + Z_beta)^2 * (sd/(mean_pre - mean_post)^2). Using normal distribution Z scores. This simplifies to N = 200 * Z_alpha * ((sd/mean_pre)^2). Here we are not using a 20% threshold of detection for simplification, and since a reference site is not being used. See 'threshold' for an example were a 20% threshold is used.
+
+```{r}
+## A data ##
+mean(eg.sim.a$EG_dens)
+sd(eg.sim.a$EG_dens)
+
+(abs((200) * qnorm(0.1))) * (sd(eg.sim.a$EG_dens) / mean(eg.sim.a$EG_dens)^2)
+
+## B data ##
+mean(eg.sim.b$EG_dens)
+sd(eg.sim.b$EG_dens)
+
+(abs((200) * qnorm(0.1))) * (sd(eg.sim.b$EG_dens) / mean(eg.sim.b$EG_dens)^2)
+
+## Threshold ##
+(abs((200) * qnorm(0.1))) * (sd(eg.sim.a$EG_dens) / (mean(eg.sim.a$EG_dens) - (0.2 * mean(eg.sim.a$EG_dens)))^2)
+```
+

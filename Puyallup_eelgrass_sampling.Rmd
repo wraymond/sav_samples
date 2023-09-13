@@ -10,6 +10,12 @@ editor_options:
 ## Puyallup eelgrass sampling
 Use data provided by Marine Surveys and Assessments (MSA) to calculate sample size needed to detect change in eelgrass density post-impact.
 
+```{r}
+## Load tidyverse library for data manipulation ##
+library(tidyverse)
+```
+
+
 ### Data
 Read in raw survey data provided by MSA. Where rows are sampling instances. Column of interest 'Transect', 'Tjoin', 'RawDepth', 'FtMLLW', 'Eg_PA', and 'Eg_dens'.
 

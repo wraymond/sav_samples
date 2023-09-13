@@ -95,7 +95,7 @@ t8 <- rpois(n = eg.sum.a$n_to_sim[9], lambda = mean(eg.sum.a$mean_EG_dens, na.rm
 
 # manually add back in original data to simulated data 
 eg.sim.a$EG_dens <- NA
-eg.sim.a[1:23, 3] <- c(37.33, 37.33, 37.33, 0, t1, 0, 0, 0, 0, 0 ,0 ,0, 0, 0, 0)
+eg.sim.a[1:23, 3] <- c(37.33, 37.33, 37.33, 0, t1, rep(0, 10))
 eg.sim.a[24:41, 3] <- rep(0, 18) # no eelgrass was present
 eg.sim.a[42:63, 3] <- c(53.33, 0, 26.67, t2, rep(0, 11))
 eg.sim.a[64:85, 3] <- c(0, 16, t3, rep(0, 15))
@@ -105,6 +105,7 @@ eg.sim.a[124:145, 3] <- c(42.67, 0, t6, rep(0, 15))
 eg.sim.a[146:165, 3] <- c(t7, rep(0, 15))
 eg.sim.a[166:184, 3] <- c(t8, rep(0, 16))
 eg.sim.a[185:201, 3] <- rep(0, 17) # no eelgrass was present
+
 ```
 
 #### B Data
@@ -136,7 +137,7 @@ t8 <- rpois(n = eg.sum.b$n_to_sim[9], lambda = mean(eg.sum.b$mean_EG_dens, na.rm
 
 # manually add back in original data to simulated data 
 eg.sim.b$EG_dens <- NA
-eg.sim.b[1:22, 3] <- c(37.33, 37.33, 37.33, 0, t1, 0, 0, 0, 0, 0 ,0 ,0, 0, 0)
+eg.sim.b[1:22, 3] <- c(37.33, 37.33, 37.33, 0, t1, rep(0, 9))
 eg.sim.b[23:40, 3] <- rep(0, 18) # no eelgrass was present
 eg.sim.b[41:60, 3] <- c(53.33, 0, 26.67, t2, rep(0, 9))
 eg.sim.b[61:79, 3] <- c(0, 16, t3, rep(0, 12))
@@ -153,18 +154,15 @@ We use a formula what assumes alpha = 0.1 and beta = 0.9 and is derived from the
 
 ```{r}
 ## A data ##
-mean(eg.sim.a$EG_dens)
-sd(eg.sim.a$EG_dens)
+mean(eg.sim.a$EG_dens, na.rm = TRUE)
+sd(eg.sim.a$EG_dens, na.rm = TRUE)
 
-(abs((200) * qnorm(0.1))) * (sd(eg.sim.a$EG_dens) / mean(eg.sim.a$EG_dens)^2)
+(abs((200) * qnorm(0.1))) * (sd(eg.sim.a$EG_dens, na.rm = TRUE) / mean(eg.sim.a$EG_dens, na.rm = TRUE)^2)
 
 ## B data ##
-mean(eg.sim.b$EG_dens)
-sd(eg.sim.b$EG_dens)
+mean(eg.sim.b$EG_dens, na.rm = TRUE)
+sd(eg.sim.b$EG_dens, na.rm = TRUE)
 
-(abs((200) * qnorm(0.1))) * (sd(eg.sim.b$EG_dens) / mean(eg.sim.b$EG_dens)^2)
-
-## Threshold ##
-(abs((200) * qnorm(0.1))) * (sd(eg.sim.a$EG_dens) / (mean(eg.sim.a$EG_dens) - (0.2 * mean(eg.sim.a$EG_dens)))^2)
+(abs((200) * qnorm(0.1))) * (sd(eg.sim.b$EG_dens, na.rm = TRUE) / mean(eg.sim.b$EG_dens, na.rm = TRUE)^2)
 ```
 

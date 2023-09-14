@@ -12,6 +12,10 @@ library(HDInterval)
 library(BayesFactor)
 library(rjags)
 library(kableExtra)
+library(ggmcmc)
+library(polspline)
+library(propagate)
+library(multcomp)
 ```
 
 
@@ -294,7 +298,7 @@ set.seed(123)
 
 ## Data ##
 pre.dat <- rgamma(100, shape = 30, rate = 1)
-post.dat <- rgamma(100, shape = 23, rate = 1)
+post.dat <- rgamma(100, shape = 24, rate = 1)
 
 dat.sim <- data.frame(
   density = c(pre.dat, post.dat),
@@ -307,21 +311,21 @@ dat.sim <- data.frame(
 ```{r}
 jags_code <- "
 model {
-  # Prior for the common shape parameter
-  shape ~ dgamma(0.001, 0.001)
+  # Prior for the common shape (alpha) parameter
+  alpha ~ dgamma(0.001, 0.001)
   
   # Priors for group means
   mu_pre ~ dgamma(0.001, 0.001)
-  mu_post ~ dgamma(0.001, 0.001)
-  
+  mu_diff ~ dgamma(0.001, 0.001)
+
   # Likelihood
   for (i in 1:N) {
-    mean[i] <- ifelse(time[i] == time[1], mu_pre, mu_post)
-    density[i] ~ dgamma(shape, 1 / mean[i])
+    mean[i] <- mu_pre + mu_diff * (time[1])
+    density[i] ~ dgamma(alpha, 1 / mean[i])
   }
   
   # Posterior summaries
-  delta <- mu_post - mu_pre
+  delta <- mu_diff
 }
 "
 ```
@@ -329,15 +333,108 @@ model {
 ##### Run
 ```{r}
 ## Specify ##
-mod <- jags.model(textConnection(jags_code), data = list(N = nrow(dat.sim), density = dat.sim$density, time = as.integer(factor(dat.sim$time))), n.chains = 3)
+mod <- jags.model(textConnection(jags_code), data = list(N = nrow(dat.sim), density = dat.sim$density, time = as.integer(dat.sim$time)), n.chains = 3)
 
 ## Burn ##
 update(mod, 1000)
-samples <- coda.samples(mod, variable.names = c("shape", "mu_pre", "mu_post", "delta"), n.iter = 5000)
+samples <- coda.samples(mod, variable.names = c("alpha", "mu_pre", "mu_diff", "delta"), n.iter = 5000)
 
 ## View ##
 summary(samples)
 
 hdi(samples)
+
+dat.sim$time <- relevel(dat.sim$time, ref = "pre")
+mod.lm <- glm(dat.sim$density ~ dat.sim$time, family = Gamma(link = "log"))
+
+summary(mod.lm)
+```
+
+#### RPubs example
+https://rpubs.com/dgolicher/jags_one_way_anova
+
+```{r}
+d <- read.csv("https://tinyurl.com/aqm-data/mussels.csv")
+```
+
+look at data
+```{r}
+theme_set(theme_bw())
+g0 <- ggplot(d,aes(x=Site,y=Lshell))
+g_box<-g0+ geom_boxplot()
+g_box
+```
+
+Confidence intervals
+```{r}
+g_mean <- g0 + stat_summary(fun.y=mean,geom="point")
+g_mean <- g_mean+stat_summary(fun.data=mean_cl_normal,geom="errorbar")
+g_mean
+```
+
+Frequentist one-way ANOVA
+```{r}
+d$Site <- as.factor(d$Site) ## Change to a site number for factor levels. This is for brevity in glht output
+mod <- lm(data = d, Lshell~Site)
+
+anova(lm(data = d, Lshell~Site))
+summary(mod)
+
+plot(glht(mod, linfct = mcp(Site = "Tukey")))
+summary(glht(mod, linfct = mcp(Site = "Tukey")))
+```
+
+JAGS
+```{r}
+d.redu <- d %>% 
+  filter(Site %in% c("Site_1", "Site_2")) %>% 
+  mutate(Site = as.character(Site))
+
+data=list(y=d.redu$Lshell,
+          ind=as.numeric(factor(d.redu$Site)),
+          N=length(d.redu$Lshell),
+          p=length(unique(d.redu$Site)),
+          overall_mean=mean(d.redu$Lshell))
+
+pooled_var="
+  model {
+      #######  Likelihood
+      for (i in 1:N) {                    # Loop through observations
+        mu[i] <- Beta[ind[i]]               # The expected values are just the group means
+        y[i] ~ dnorm(mu[i],tau)           # Values treated as from a single normal
+       
+      }
+     ############## Uninformative priors
+    for (j in 1:p) {
+     Beta[j] ~ dnorm(0,0.0001)
+   
+     Effect[j] <- Beta[j] - overall_mean  ### Calculate difference from overall mean
+     ################### Calculate pair wise differences 
+      for (n in 1:(j-1)){
+        Difbeta[n,j] <- Beta[n]-Beta[j]
+      }
+    }
+    
+    tau ~ dgamma(scale, rate) ## Prior for normal distribution precision.
+    scale ~ dunif(0, 1)       ### Hyper parameters for tau.
+    rate ~ dunif(0, 1)
+    
+  }
+"
+
+mod.bys <- jags.model(textConnection(pooled_var),data=data)
+```
+
+refine
+```{r}
+update(mod.bys, n.iter = 1000)
+output = coda.samples(model=mod.bys, variable.names = c("Difbeta","Effect"), n.iter=100000, thin=10)
+
+ms <-ggs(output) 
+mt <- filter(ms,grepl("Difbeta", Parameter))
+ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
+
+mt<-filter(ms,grepl("Effect",Parameter))
+ggs_caterpillar(mt) +geom_vline(xintercept = 0,col="red")
 ```
 

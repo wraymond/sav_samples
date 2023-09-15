@@ -438,3 +438,83 @@ mt<-filter(ms,grepl("Effect",Parameter))
 ggs_caterpillar(mt) +geom_vline(xintercept = 0,col="red")
 ```
 
+##### Building off RPubs Example
+from above
+
+###### Data
+```{r}
+set.seed(123)
+
+## Data ##
+pre.dat <- c(rpois(65, lambda = 30), rep(0, 35))
+post.dat <- c(rpois(60, lambda = 24 ), rep(0, 40))
+
+dat.sim <- data.frame(
+  density = c(pre.dat, post.dat),
+  time = factor(rep(c("initial", "post"), each = 100))
+)
+
+ggplot(dat.sim) +
+  geom_histogram(aes(density), binwidth = 1) +
+  facet_wrap(~time)
+```
+
+###### Model
+```{r}
+## Define data object ##
+d <- list(y = dat.sim$density,
+          time = as.numeric(factor(dat.sim$time)),
+          N = length(dat.sim$density),
+          p = length(unique(as.numeric(factor(dat.sim$time)))),
+          overall_mean = mean(dat.sim$density),
+          lambda = 1)
+
+## JAGS ##
+jags.mod <- "
+model {
+  ## Likelihood ##
+  for (t in 1:N) { # Loop through observations
+    mu[t] <- Beta[time[t]] # Use 'time' as an index to get the group mean
+    y[t] ~ dpois(mu[t]) # Values treated as Poisson-distributed
+  }
+
+  ## Uninformative priors ##
+  for (j in 1:p) {
+    Beta[j] ~ dnorm(0, 0.0001)
+    Effect[j] <- Beta[j] - overall_mean ### Calculate difference from overall mean
+    
+    ## Calculate pairwise differences ##
+    for (n in 1:(j - 1)) {
+      Difbeta[n, j] <- Beta[n] - Beta[j]
+    }
+  }
+
+  ## Prior for Poisson parameter (mean) ##
+  lambda ~ dgamma(0.001, 0.001)
+}
+"
+
+## Initial values ##
+initial_values <- list(Beta = rep(0, d$p))
+
+## Fit ##
+mod.bys <- jags.model(textConnection(jags.mod), data = d, inits = initial_values)
+```
+
+refine
+```{r}
+update(mod.bys, n.iter = 1000)
+output = coda.samples(model=mod.bys, variable.names = c("Difbeta","Effect"), n.iter=100000, thin=10)
+
+ms <-ggs(output) 
+mt <- filter(ms,grepl("Difbeta", Parameter))
+ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
+
+mt <- filter(ms,grepl("Effect",Parameter))
+ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
+
+summary(output)
+
+summary(lm(density~time, data = dat.sim))
+```
+

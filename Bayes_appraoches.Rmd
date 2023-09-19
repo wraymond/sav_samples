@@ -16,6 +16,7 @@ library(ggmcmc)
 library(polspline)
 library(propagate)
 library(multcomp)
+library(pwr)
 ```
 
 
@@ -443,7 +444,7 @@ from above
 
 ###### Data
 ```{r}
-set.seed(123)
+set.seed(5)
 
 ## Data ##
 pre.dat <- c(rpois(65, lambda = 30), rep(0, 35))
@@ -462,59 +463,127 @@ ggplot(dat.sim) +
 ###### Model
 ```{r}
 ## Define data object ##
-d <- list(y = dat.sim$density,
-          time = as.numeric(factor(dat.sim$time)),
-          N = length(dat.sim$density),
-          p = length(unique(as.numeric(factor(dat.sim$time)))),
-          overall_mean = mean(dat.sim$density),
-          lambda = 1)
+d <- list(
+  y = as.numeric(dat.sim$density), # Convert 'y' to numeric
+  time = as.numeric(factor(dat.sim$time)),
+  N = length(dat.sim$density),
+  p = length(unique(as.numeric(factor(dat.sim$time)))),
+  overall_mean = mean(dat.sim$density),
+  lambda = 1
+)
 
 ## JAGS ##
-jags.mod <- "
+jags.mod <-  "
 model {
-  ## Likelihood ##
-  for (t in 1:N) { # Loop through observations
-    mu[t] <- Beta[time[t]] # Use 'time' as an index to get the group mean
-    y[t] ~ dpois(mu[t]) # Values treated as Poisson-distributed
+  for (i in 1:length(density)) {
+    density[i] ~ dpois(lambda[time[i]])
   }
 
-  ## Uninformative priors ##
-  for (j in 1:p) {
-    Beta[j] ~ dnorm(0, 0.0001)
-    Effect[j] <- Beta[j] - overall_mean ### Calculate difference from overall mean
-    
-    ## Calculate pairwise differences ##
-    for (n in 1:(j - 1)) {
-      Difbeta[n, j] <- Beta[n] - Beta[j]
-    }
-  }
+  lambda[1] ~ dgamma(1, 0.01)  # Prior for initial time
+  lambda[2] ~ dgamma(1, 0.01)  # Prior for post time
 
-  ## Prior for Poisson parameter (mean) ##
-  lambda ~ dgamma(0.001, 0.001)
+  delta_lambda <- lambda[2] - lambda[1]
+  delta_lam_fac <- (lambda[2] - lambda[1]) / lambda[1]
+
+  # Effect size
+  effect_size <- delta_lambda / sqrt((lambda[1] + lambda[2]) / 2)
+
+  # Pooled variance estimate
+  sigma2 ~ dgamma(0.001, 0.001)
+
+  # Convert variance to standard deviation
+  sigma <- sqrt(sigma2)
 }
 "
 
-## Initial values ##
-initial_values <- list(Beta = rep(0, d$p))
-
 ## Fit ##
-mod.bys <- jags.model(textConnection(jags.mod), data = d, inits = initial_values)
+mod.bys <- jags.model(textConnection(jags.mod), data = dat.sim)
 ```
 
 refine
 ```{r}
 update(mod.bys, n.iter = 1000)
-output = coda.samples(model=mod.bys, variable.names = c("Difbeta","Effect"), n.iter=100000, thin=10)
+output <- coda.samples(model = mod.bys, 
+                      variable.names = c("lambda", "effect_size", "sigma", "delta_lambda", "delta_lam_fac"), 
+                      n.iter=10000, 
+                      thin=10)
 
-ms <-ggs(output) 
-mt <- filter(ms,grepl("Difbeta", Parameter))
+## Lambda ##
+ggplot(ms)
+
+ms <- ggs(output) 
+mt <- filter(ms, grepl("lambda", Parameter))
 ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
 
-mt <- filter(ms,grepl("Effect",Parameter))
+mt <- filter(ms, grepl("effect_size", Parameter))
+ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
+
+mt <- filter(ms, grepl("delta_lam_fac", Parameter))
 ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
 
 summary(output)
 
-summary(lm(density~time, data = dat.sim))
+summary(glm(density~time, family = poisson(link = "log"), data = dat.sim))
+```
+
+###### N calc
+
+```{r}
+# Set the seed for reproducibility
+set.seed(123)
+
+# Set the target effect size and confidence level
+target_effect_size <- -1.6094  # The desired effect size
+confidence_level <- 0.90  # 90% confidence level
+
+# Initialize variables
+sample_sizes <- 1:500  # Sample sizes to try
+simulations <- 1000  # Number of simulations for each sample size
+success_probabilities <- numeric(length(sample_sizes))  # Store success probabilities
+
+# Define the JAGS model code (as provided earlier)
+
+# Perform the simulation for different sample sizes
+for (i in 1:length(sample_sizes)) {
+  success_count <- 0  # Count of successful simulations
+  
+  for (j in 1:simulations) {
+    # Generate data with the current sample size
+    N_sim <- sample_sizes[i]
+    pre.dat <- c(rpois(N_sim, lambda = 30), rep(0, 100 - N_sim))
+    post.dat <- c(rpois(N_sim, lambda = 24), rep(0, 100 - N_sim))
+    
+    dat.sim <- data.frame(
+      density = c(pre.dat, post.dat),
+      time = factor(rep(c("initial", "post"), each = 100))
+    )
+    
+    # Create a JAGS model with the current data
+    model <- jags.model(textConnection(model_code), data = dat.sim, n.chains = 3)
+    
+    # Burn-in and sampling
+    update(model, 1000)
+    samples <- coda.samples(model, variable.names = c("effect_size"), n.iter = 2000)
+    
+    # Extract the posterior samples of the effect size
+    effect_size_samples <- samples[[1]]$effect_size
+    
+    # Check if the effect size is greater than or equal to the target effect size
+    if (any(effect_size_samples >= target_effect_size)) {
+      success_count <- success_count + 1
+    }
+  }
+  
+  # Calculate the success probability for the current sample size
+  success_probabilities[i] <- success_count / simulations
+}
+
+# Find the sample size that meets the desired success probability
+selected_sample_size <- sample_sizes[min(which(success_probabilities >= confidence_level))]
+
+# Output the selected sample size and success probabilities
+cat("Selected Sample Size:", selected_sample_size, "\n")
+cat("Success Probabilities:", success_probabilities, "\n")
+
 ```
 

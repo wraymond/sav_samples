@@ -17,6 +17,8 @@ library(polspline)
 library(propagate)
 library(multcomp)
 library(pwr)
+library(parallel)
+library(doParallel)
 ```
 
 
@@ -444,16 +446,38 @@ from above
 
 ###### Data
 ```{r}
-set.seed(5)
+set.seed(123)
 
-## Data ##
-pre.dat <- c(rpois(65, lambda = 30), rep(0, 35))
-post.dat <- c(rpois(60, lambda = 24 ), rep(0, 40))
+# Define sample sizes for pre and post-treatment groups
+N <- 100  # Assuming 100 observations in each group
 
+# Real world values
+mean_pre <- 30
+mean_post <- 24
+
+sd_pre <- 10
+sd_post <- 8
+
+# Parameters for the gamma distribution
+alpha_pre <- (mean_pre^2) / (sd_pre^2)  # Shape parameter for pre-treatment group
+beta_pre <- (sd_pre^2) / mean_pre  # Rate parameter for pre-treatment group
+
+alpha_post <- (mean_post^2) / (sd_post ^2)  # Shape parameter for post-treatment group
+beta_post <- (sd_post ^2) / mean_post  # Rate parameter for post-treatment group
+
+# Generate gamma-distributed data for pre and post-treatment groups
+pre.dat <- rgamma(N, shape = alpha_pre, rate = beta_pre)
+post.dat <- rgamma(N, shape = alpha_post, rate = beta_post)
+
+# Create a data frame
 dat.sim <- data.frame(
   density = c(pre.dat, post.dat),
-  time = factor(rep(c("initial", "post"), each = 100))
+  time = factor(rep(c("pre", "post"), each = N))
 )
+
+# Summary statistics
+summary(pre.dat)
+summary(post.dat)
 
 ggplot(dat.sim) +
   geom_histogram(aes(density), binwidth = 1) +
@@ -462,42 +486,31 @@ ggplot(dat.sim) +
 
 ###### Model
 ```{r}
-## Define data object ##
-d <- list(
-  y = as.numeric(dat.sim$density), # Convert 'y' to numeric
-  time = as.numeric(factor(dat.sim$time)),
-  N = length(dat.sim$density),
-  p = length(unique(as.numeric(factor(dat.sim$time)))),
-  overall_mean = mean(dat.sim$density),
-  lambda = 1
-)
-
 ## JAGS ##
-jags.mod <-  "
+jags.mod <- "
 model {
-  for (i in 1:length(density)) {
-    density[i] ~ dpois(lambda[time[i]])
+  for (i in 1:2) {
+    for (j in 1:N) {
+      y[i, j] ~ dgamma(alpha[time[i]], beta[time[[i]])
+    }
   }
 
-  lambda[1] ~ dgamma(1, 0.01)  # Prior for initial time
-  lambda[2] ~ dgamma(1, 0.01)  # Prior for post time
+  for (i in 1:2) {
+    mu[i] ~ dnorm(mu0, tau)
+  }
 
-  delta_lambda <- lambda[2] - lambda[1]
-  delta_lam_fac <- (lambda[2] - lambda[1]) / lambda[1]
-
-  # Effect size
-  effect_size <- delta_lambda / sqrt((lambda[1] + lambda[2]) / 2)
-
-  # Pooled variance estimate
-  sigma2 ~ dgamma(0.001, 0.001)
-
-  # Convert variance to standard deviation
-  sigma <- sqrt(sigma2)
+  mu0 ~ dnorm(0, 1.0E-6)
+  tau ~ dgamma(1.0E-3, 1.0E-3)
+  alpha[1] ~ dgamma(1.0E-3, 1.0E-3)
+  beta[1] ~ dgamma(1.0E-3, 1.0E-3)
+  alpha[2] ~ dgamma(1.0E-3, 1.0E-3)
+  beta[2] ~ dgamma(1.0E-3, 1.0E-3)
+  beta_post ~ dgamma(1.0E-3, 1.0E-3)
 }
 "
 
 ## Fit ##
-mod.bys <- jags.model(textConnection(jags.mod), data = dat.sim)
+mod.bys <- jags.model(textConnection(jags.mod), data =  list(y = as.matrix(dat.sim$density), N = N))
 ```
 
 refine
@@ -507,9 +520,6 @@ output <- coda.samples(model = mod.bys,
                       variable.names = c("lambda", "effect_size", "sigma", "delta_lambda", "delta_lam_fac"), 
                       n.iter=10000, 
                       thin=10)
-
-## Lambda ##
-ggplot(ms)
 
 ms <- ggs(output) 
 mt <- filter(ms, grepl("lambda", Parameter))
@@ -523,67 +533,62 @@ ggs_caterpillar(mt) + geom_vline(xintercept = 0,col="red")
 
 summary(output)
 
-summary(glm(density~time, family = poisson(link = "log"), data = dat.sim))
+summary(glm(density~time, family = Gamma(link = "log"), data = dat.sim))
 ```
 
 ###### N calc
 
 ```{r}
-# Set the seed for reproducibility
-set.seed(123)
+# Set parameters
+effect_size <- -0.2  # Desired difference in lambda
+alpha <- 0.1  # Significance level
+beta <- 0.1  # Desired Type II error (1 - power)
+lambda_baseline <- 19  # Initial Poisson rate (for example)
+sample_sizes <- 1:100  # Range of sample sizes to try
+simulations_per_sample_size <- 100  # Number of simulations for each sample size
 
-# Set the target effect size and confidence level
-target_effect_size <- -1.6094  # The desired effect size
-confidence_level <- 0.90  # 90% confidence level
+# Initialize variables to store results
+sample_size_results <- numeric(length(sample_sizes))
 
-# Initialize variables
-sample_sizes <- 1:500  # Sample sizes to try
-simulations <- 1000  # Number of simulations for each sample size
-success_probabilities <- numeric(length(sample_sizes))  # Store success probabilities
-
-# Define the JAGS model code (as provided earlier)
-
-# Perform the simulation for different sample sizes
+# Perform power analysis for each sample size
 for (i in 1:length(sample_sizes)) {
-  success_count <- 0  # Count of successful simulations
+  sample_size <- sample_sizes[i]
+  significant_results <- 0  # Count of successful simulations for this sample size
   
-  for (j in 1:simulations) {
-    # Generate data with the current sample size
-    N_sim <- sample_sizes[i]
-    pre.dat <- c(rpois(N_sim, lambda = 30), rep(0, 100 - N_sim))
-    post.dat <- c(rpois(N_sim, lambda = 24), rep(0, 100 - N_sim))
+  for (j in 1:simulations_per_sample_size) {
+    # Generate data for baseline and changed rates
+    pre.dat <- rpois(sample_size, lambda = lambda_baseline)
+    post.dat <- rpois(sample_size, lambda = lambda_baseline + (lambda_baseline * effect_size))
     
-    dat.sim <- data.frame(
-      density = c(pre.dat, post.dat),
-      time = factor(rep(c("initial", "post"), each = 100))
+    # Create a data frame for Poisson regression
+    data <- data.frame(
+      y = c(pre.dat, post.dat),
+      group = factor(rep(1:2, each = sample_size))
     )
     
-    # Create a JAGS model with the current data
-    model <- jags.model(textConnection(model_code), data = dat.sim, n.chains = 3)
+    # Perform Poisson regression
+    model <- glm(y ~ group, data = data, family = poisson)
     
-    # Burn-in and sampling
-    update(model, 1000)
-    samples <- coda.samples(model, variable.names = c("effect_size"), n.iter = 2000)
+    # Check if the coefficient for 'group2' (representing the change) is significant
+    p_value <- summary(model)$coefficients["group2", "Pr(>|z|)"]
     
-    # Extract the posterior samples of the effect size
-    effect_size_samples <- samples[[1]]$effect_size
-    
-    # Check if the effect size is greater than or equal to the target effect size
-    if (any(effect_size_samples >= target_effect_size)) {
-      success_count <- success_count + 1
+    # Check if the test is significant at the desired alpha level
+    if (p_value < alpha) {
+      significant_results <- significant_results + 1
     }
   }
   
-  # Calculate the success probability for the current sample size
-  success_probabilities[i] <- success_count / simulations
+  # Calculate the probability of detecting a difference for this sample size
+  probability <- significant_results / simulations_per_sample_size
+  sample_size_results[i] <- probability
 }
 
-# Find the sample size that meets the desired success probability
-selected_sample_size <- sample_sizes[min(which(success_probabilities >= confidence_level))]
+# Output the sample sizes and corresponding probabilities
+result_df <- data.frame(Sample_Size = sample_sizes, Probability = sample_size_results)
 
-# Output the selected sample size and success probabilities
-cat("Selected Sample Size:", selected_sample_size, "\n")
-cat("Success Probabilities:", success_probabilities, "\n")
+ggplot(result_df) + 
+  geom_point(aes(x = Sample_Size, y = Probability)) + 
+  geom_hline(aes(yintercept = 0.9), color = "red")
 
 ```
 

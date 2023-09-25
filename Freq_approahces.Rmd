@@ -1,0 +1,115 @@
+---
+title: "Freq_approaches"
+author: "Wendel Raymond"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+## Frequentist approaches to SAV analysis
+Use frequentist statistics to compare SAV data and calcualte sample size
+
+```{r}
+library(tidyverse)
+library(pwr)
+```
+
+### Data
+
+```{r}
+set.seed(123)
+
+# Define sample sizes for pre and post-treatment groups
+N <- 100  # Assuming 100 observations in each group
+
+# Real world values
+mean_pre <- 30
+mean_post <- 24
+ref_mean_pre <- 28.4
+ref_mean_post <- 29
+
+sd_pre <- 10
+sd_post <- 8
+ref_sd_pre <- 10
+ref_sd_post <- 9.5
+
+# Parameters for the gamma distribution
+alpha_pre <- (mean_pre^2) / (sd_pre^2)  # Shape parameter for pre-treatment group
+beta_pre <- (sd_pre^2) / mean_pre  # Rate parameter for pre-treatment group
+
+ref_alpha_pre <- (ref_mean_pre^2) / (ref_sd_pre^2)  # Shape parameter for pre-treatment group
+ref_beta_pre <- (ref_sd_pre^2) / ref_mean_pre  # Rate parameter for pre-treatment group
+
+alpha_post <- (mean_post^2) / (sd_post ^2)  # Shape parameter for post-treatment group
+beta_post <- (sd_post ^2) / mean_post  # Rate parameter for post-treatment group
+
+ref_alpha_post <- (ref_mean_post^2) / (ref_sd_post ^2)  # Shape parameter for post-treatment group
+ref_beta_post <- (ref_sd_post ^2) / ref_mean_post  # Rate parameter for post-treatment group
+
+# Generate gamma-distributed data for pre and post-treatment groups
+pre.dat <- rnorm(N, mean = mean_pre, sd = sd_pre)
+post.dat <- rnorm(N, mean = mean_post, sd = sd_post)
+ref.pre.dat <- rnorm(N, mean = ref_mean_pre, sd = ref_sd_pre)
+ref.post.dat <- rnorm(N, mean = ref_mean_pre, sd = ref_sd_pre)
+
+# Create a data frame
+dat.sim <- data.frame(
+  density = c(pre.dat, post.dat, ref.pre.dat, ref.post.dat),
+  site = factor(rep(c("proj", "ref"), each = N*2)),
+  time = factor(rep(c("pre", "post"), each = N))
+)
+
+dat.sim$time <- factor(dat.sim$time, levels = c("pre", "post"))
+
+# Summary statistics
+summary(pre.dat)
+summary(post.dat)
+
+ggplot(dat.sim) +
+  geom_histogram(aes(density), binwidth = 1) +
+  facet_wrap(~time+site)
+```
+
+### Compare no refernce 
+```{r}
+mod1 <- glm(density ~ time, data = dat.sim, family = Gamma(link = "log"))
+
+summary(mod1)
+anova(mod1)
+```
+
+### Compare wiht refernece
+```{r}
+mod2 <- glm(density ~ time/site, data = dat.sim, family = Gamma(link = "log"))
+
+summary(mod2)
+```
+
+
+### N star
+```{r}
+# Known parameters
+mean_pre <- 30
+alpha <- 0.1      # Significance level
+beta <- 0.9       # Desired power
+sd_pre <- 10
+delta <- (0.2 * mean_pre)  # Minimum detectable effect size (20% change)
+
+# Calculate critical values
+z_alpha_over_2 <- qnorm(1 - alpha/2)
+z_beta <- abs(qnorm(1 - beta))
+
+# Calculate sample size per group
+sample_size <- ((2 * (z_alpha_over_2 + z_beta)^2 * sd_pre^2) / delta^2)
+```
+
+```{r}
+dat.test <- data.frame(
+  dist = c(46, 38, 34, 37, 60, 64, 59)
+)
+
+dat.test$prop <- dat.test$dist / sum(dat.test$dist)
+
+dat.test$quad <- round(dat.test$prop * 48, 0)
+```
+

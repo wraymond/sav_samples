@@ -12,6 +12,7 @@ Use frequentist statistics to compare SAV data and calcualte sample size
 ```{r}
 library(tidyverse)
 library(pwr)
+library(emmeans)
 ```
 
 ### Data
@@ -20,15 +21,15 @@ library(pwr)
 set.seed(123)
 
 # Define sample sizes for pre and post-treatment groups
-N <- 100  # Assuming 100 observations in each group
+N <- 48  # Assuming 100 observations in each group
 
 # Real world values
-mean_pre <- 30
-mean_post <- 24
+mean_pre <- 22.9
+mean_post <- 20
 ref_mean_pre <- 28.4
 ref_mean_post <- 29
 
-sd_pre <- 10
+sd_pre <- 8.48
 sd_post <- 8
 ref_sd_pre <- 10
 ref_sd_post <- 9.5
@@ -72,10 +73,20 @@ ggplot(dat.sim) +
 
 ### Compare no refernce 
 ```{r}
-mod1 <- glm(density ~ time, data = dat.sim, family = Gamma(link = "log"))
+dat.sim.proj <- dat.sim %>% 
+  filter(site == "proj")
+
+dat.sim.proj %>% 
+  group_by(time) %>% 
+  summarize(mean = mean(density),
+            sd = sd(density))
+
+mod1 <- glm(density ~ time, data = dat.sim.proj, family = Gamma(link = "log"))
 
 summary(mod1)
 anova(mod1)
+
+emmeans(mod1, specs = "time")
 ```
 
 ### Compare wiht refernece

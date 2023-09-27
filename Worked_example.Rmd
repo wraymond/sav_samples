@@ -1,0 +1,192 @@
+---
+title: "Worked_example"
+author: "Wendel Raymond"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Worked example
+Example data and analysis for an eelgrass analysis of a HPA permitted project. Write up in Appendix A of Eelgrass and macroalgae survey guidelines.
+
+```{r}
+library(tidyverse)
+
+theme_set(theme_classic())
+```
+
+### Data
+```{r}
+dat <- read.csv("example_eelgrass_data.csv", header = TRUE, stringsAsFactors = FALSE)
+
+dat$time <- factor(dat$time, levels = c("pre", "one", "three", "five"))
+dat$site <- factor(dat$site, levels = c("proj", "ref"))
+
+dat.sum <- dat %>% 
+  group_by(site, time) %>% 
+  summarize(mean = mean(density),
+            sd = sd(density))
+
+pal <- c("#6A8026", "#3542A1")
+```
+
+### N-star
+```{r}
+# Known parameters
+mean_pre <- 30
+alpha <- 0.1      # Significance level
+beta <- 0.9       # Desired power
+sd_pre <- 10
+delta <- (0.2 * mean_pre)  # Minimum detectable effect size (20% change)
+
+# Calculate critical values
+z_alpha_over_2 <- qnorm(1 - alpha/2)
+z_beta <- abs(qnorm(1 - beta))
+
+# Calculate sample size per group
+sample_size <- ((2 * (z_alpha_over_2 + z_beta)^2 * sd_pre^2) / delta^2)
+round(sample_size, 0)
+```
+
+### Monitoring and mitigation
+
+#### Option 1: Upfront mitigation
+
+```{r}
+mean_pre <- dat.sum[[1, 3]]
+sd_pre <- dat.sum[[1, 4]]
+
+tot_area <- 314
+
+tot_pre_shoots <- tot_area * mean_pre
+round(tot_pre_shoots, 0)
+```
+
+#### Option 2: No upfront mitigation
+
+```{r}
+ggplot(dat.sum %>% 
+         filter(site == "proj")) +
+  geom_col(aes(x = time, y = mean, fill = site)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 30.4), color = pal[1], linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+```
+
+##### Analyses
+```{r}
+## Year 1 ##
+dat.1 <- dat %>% 
+  filter(site == "proj") %>% 
+  filter(time %in% c("pre", "one"))
+
+mod.1 <- glm(density ~ time, data = dat.1, family = Gamma(link = "log"))
+summary(mod.1)
+
+## Year 3 ##
+dat.2 <- dat %>% 
+  filter(site == "proj") %>% 
+  filter(time %in% c("pre", "three"))
+
+mod.2 <- glm(density ~ time, data = dat.2, family = Gamma(link = "log"))
+summary(mod.2)
+
+## Year 5 ##
+### Compare to pre ##
+dat.3 <- dat %>% 
+  filter(site == "proj") %>% 
+  filter(time %in% c("pre", "five"))
+
+mod.3 <- glm(density ~ time, data = dat.3, family = Gamma(link = "log"))
+summary(mod.3)
+
+### Compare to year 3 ##
+dat.4 <- dat %>% 
+  filter(site == "proj") %>% 
+  filter(time %in% c("three", "five"))
+
+mod.4 <- glm(density ~ time, data = dat.4, family = Gamma(link = "log"))
+summary(mod.4)
+```
+
+##### Mitigation
+
+```{r}
+## Year 3 ##
+mean_3yr <- dat.sum[[3, 3]]
+
+tot_shoots_3yr <- tot_area * mean_3yr
+
+mit_shoots_3yr <- tot_pre_shoots - tot_shoots_3yr
+round(mit_shoots_3yr)
+```
+
+#### Option 3: No upfront mitgation with reference.
+
+```{r}
+ggplot(dat.sum) +
+  geom_col(aes(x = time, y = mean, group = site, fill = site), position = position_dodge(1)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), position = position_dodge(1), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 30.4), color = pal[1], linetype = "dashed") +
+  geom_hline(aes(yintercept = 31.8), color = pal[2], linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+```
+
+##### Analyses
+
+```{r}
+## Project to reference ##
+dat.5 <- dat %>% 
+  filter(site %in% c("proj", "ref")) %>% 
+  filter(time %in% c("pre"))
+
+mod.5 <- glm(density ~ site, data = dat.5, family = Gamma(link = "log"))
+summary(mod.5)
+
+## Year 1 ##
+dat.6 <- dat %>% 
+  filter(time %in% c("pre", "one"))
+
+mod.6 <- glm(density ~ time/site, data = dat.6, family = Gamma(link = "log"))
+summary(mod.6)
+
+## Year 3 ##
+dat.7 <- dat %>% 
+  filter(time %in% c("pre", "three"))
+
+mod.7 <- glm(density ~ time/site, data = dat.7, family = Gamma(link = "log"))
+summary(mod.7)
+
+## Year 5 ##
+dat.8 <- dat %>% 
+  filter(time %in% c("pre", "five"))
+
+mod.8 <- glm(density ~ time/site, data = dat.8, family = Gamma(link = "log"))
+summary(mod.8)
+
+### Compare to year 3 ##
+dat.9 <- dat %>% 
+  filter(time %in% c("three", "five"))
+
+mod.9 <- glm(density ~ time/site, data = dat.9, family = Gamma(link = "log"))
+summary(mod.9)
+```
+
+##### Mitigation
+```{r}
+## Year 3 ##
+mean_3yr_ref <- exp(mod.7$coefficients[[1]] - mod.7$coefficients[[4]])
+
+tot_shoots_3yr_ref <- tot_area * mean_3yr_ref
+
+mit_shoots_3yr_ref <- tot_pre_shoots - tot_shoots_3yr_ref
+round(mit_shoots_3yr_ref)
+```
+

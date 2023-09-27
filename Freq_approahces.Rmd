@@ -21,54 +21,86 @@ library(emmeans)
 set.seed(123)
 
 # Define sample sizes for pre and post-treatment groups
-N <- 48  # Assuming 100 observations in each group
+N_proj <- 48
+N_ref <- 50
 
-# Real world values
-mean_pre <- 22.9
-mean_post <- 20
-ref_mean_pre <- 28.4
-ref_mean_post <- 29
+# means
+proj_pre_mean <- 30.2
+proj_1_mean <- 29.2
+proj_3_mean <- 22.9 
+proj_5_mean <- 20.8
 
-sd_pre <- 8.48
-sd_post <- 8
-ref_sd_pre <- 10
-ref_sd_post <- 9.5
+ref_pre_mean <- 32.5
+ref_1_mean <- 30.2
+ref_3_mean <- 27.4
+ref_5_mean <- 21.3
 
-# Parameters for the gamma distribution
-alpha_pre <- (mean_pre^2) / (sd_pre^2)  # Shape parameter for pre-treatment group
-beta_pre <- (sd_pre^2) / mean_pre  # Rate parameter for pre-treatment group
+# sd
+proj_pre_sd <- 9.39
+proj_1_sd <- 8.38
+proj_3_sd <- 8.48 
+proj_5_sd <- 7.54
 
-ref_alpha_pre <- (ref_mean_pre^2) / (ref_sd_pre^2)  # Shape parameter for pre-treatment group
-ref_beta_pre <- (ref_sd_pre^2) / ref_mean_pre  # Rate parameter for pre-treatment group
+ref_pre_sd <- 10.0
+ref_1_sd <- 9.39
+ref_3_sd <- 8.75
+ref_5_sd <- 7.98
 
-alpha_post <- (mean_post^2) / (sd_post ^2)  # Shape parameter for post-treatment group
-beta_post <- (sd_post ^2) / mean_post  # Rate parameter for post-treatment group
+# generate data
+proj.pre.dat <- rnorm(N_proj, mean = proj_pre_mean, sd = proj_pre_sd)
+proj.1.dat <- rnorm(N_proj, mean = proj_1_mean, sd = proj_1_sd)
+proj.3.dat <- rnorm(N_proj, mean = proj_3_mean, sd = proj_3_sd)
+proj.5.dat <- rnorm(N_proj, mean = proj_5_mean, sd = proj_5_sd)
 
-ref_alpha_post <- (ref_mean_post^2) / (ref_sd_post ^2)  # Shape parameter for post-treatment group
-ref_beta_post <- (ref_sd_post ^2) / ref_mean_post  # Rate parameter for post-treatment group
-
-# Generate gamma-distributed data for pre and post-treatment groups
-pre.dat <- rnorm(N, mean = mean_pre, sd = sd_pre)
-post.dat <- rnorm(N, mean = mean_post, sd = sd_post)
-ref.pre.dat <- rnorm(N, mean = ref_mean_pre, sd = ref_sd_pre)
-ref.post.dat <- rnorm(N, mean = ref_mean_pre, sd = ref_sd_pre)
+ref.pre.dat <- rnorm(N_ref, mean = ref_pre_mean, sd = ref_pre_sd)
+ref.1.dat <- rnorm(N_ref, mean = ref_1_mean, sd = ref_1_sd)
+ref.3.dat <- rnorm(N_ref, mean = ref_3_mean, sd = ref_3_sd)
+ref.5.dat <- rnorm(N_ref, mean = ref_5_mean, sd = ref_5_sd)
 
 # Create a data frame
 dat.sim <- data.frame(
-  density = c(pre.dat, post.dat, ref.pre.dat, ref.post.dat),
-  site = factor(rep(c("proj", "ref"), each = N*2)),
-  time = factor(rep(c("pre", "post"), each = N))
+  time = c(rep("pre", N_proj), rep("one", N_proj), rep("three", N_proj), rep("five", N_proj), rep("pre", N_ref), rep("one", N_ref), rep("three", N_ref), rep("five", N_ref)),
+  site = c(rep("proj", N_proj * 4), rep("ref", N_ref * 4)),
+  density = c(proj.pre.dat, proj.1.dat, proj.3.dat, proj.5.dat, ref.pre.dat, ref.1.dat, ref.3.dat, ref.5.dat)
 )
 
-dat.sim$time <- factor(dat.sim$time, levels = c("pre", "post"))
-
-# Summary statistics
-summary(pre.dat)
-summary(post.dat)
+dat.sim$time <- factor(dat.sim$time, levels = c("pre", "one", "three", "five"))
+dat.sim$site <- factor(dat.sim$site, levels = c("proj", "ref"))
 
 ggplot(dat.sim) +
   geom_histogram(aes(density), binwidth = 1) +
-  facet_wrap(~time+site)
+  facet_wrap(~site + time, nrow = 4, ncol = 2)
+
+dat.sim.sum <- dat.sim %>% 
+  group_by(time, site) %>% 
+  summarise(mean = mean(density),
+            sd = sd(density))
+
+dat.sim.sum$time <- factor(dat.sim.sum$time, levels = c("pre", "one", "three", "five"))
+dat.sim.sum$site <- factor(dat.sim.sum$site, levels = c("proj", "ref"))
+
+pal <- c("#6A8026", "#3542A1")
+
+
+ggplot(dat.sim.sum %>% 
+         filter(site == "proj")) +
+  geom_col(aes(x = time, y = mean, fill = site)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 30.4), color = pal[1], linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+
+ggplot(dat.sim.sum) +
+  geom_col(aes(x = time, y = mean, group = site, fill = site), position = position_dodge(1)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), position = position_dodge(1), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 30.4), color = pal[1], linetype = "dashed") +
+  geom_hline(aes(yintercept = 31.8), color = pal[2], linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
 ```
 
 ### Compare no refernce 
@@ -81,7 +113,7 @@ dat.sim.proj %>%
   summarize(mean = mean(density),
             sd = sd(density))
 
-mod1 <- glm(density ~ time, data = dat.sim.proj, family = Gamma(link = "log"))
+mod1 <- glm(density ~ site, data = dat.sim, family = Gamma(link = "log"))
 
 summary(mod1)
 anova(mod1)
@@ -89,11 +121,25 @@ anova(mod1)
 emmeans(mod1, specs = "time")
 ```
 
-### Compare wiht refernece
+### Compare with refernece
 ```{r}
-mod2 <- glm(density ~ time/site, data = dat.sim, family = Gamma(link = "log"))
+dat.1 <- dat.sim %>% 
+  filter(time %in% c("pre", "one")) %>% 
+  filter(site %in% c("proj", "ref"))
+
+mod2 <- glm(density ~ time / site, data = dat.1, family = Gamma(link = "log"))
 
 summary(mod2)
+
+dat.3 <- dat.sim %>% 
+  filter(time %in% c("pre", "three")) %>% 
+  filter(site %in% c("proj", "ref"))
+
+mod3 <- glm(density ~ time / site, data = dat.3, family = Gamma(link = "log"))
+
+summary(mod3)
+
+
 ```
 
 

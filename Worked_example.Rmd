@@ -14,6 +14,8 @@ Example data and analysis for an eelgrass analysis of a HPA permitted project. W
 library(tidyverse)
 
 theme_set(theme_classic())
+
+set.seed(9)
 ```
 
 ### Data
@@ -188,5 +190,28 @@ tot_shoots_3yr_ref <- tot_area * mean_3yr_ref
 
 mit_shoots_3yr_ref <- tot_pre_shoots - tot_shoots_3yr_ref
 round(mit_shoots_3yr_ref)
+```
+
+### Other examples
+
+#### Ex 1
+
+edit data 
+```{r}
+dat.adj.1 <- dat %>% 
+  filter(time %in% c("pre", "one")) 
+
+dat.adj.1[49:96, 3] <- dat.adj.1[49:96, 3] * 0.75
+dat.adj.1[147:196, 3] <- dat.adj.1[147:196, 3] * 0.75
+
+dat.adj.1.sum <- dat.adj.1 %>% 
+  group_by(site, time) %>% 
+  summarise(mean = mean(density),
+            sd = sd(density))
+```
+
+```{r}
+mod.10 <- glm(density ~ time/site, data = dat.adj.1, family = Gamma(link = "log"))
+summary(mod.10)
 ```
 

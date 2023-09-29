@@ -166,3 +166,26 @@ sd(eg.sim.b$EG_dens, na.rm = TRUE)
 (abs((200) * qnorm(0.1))) * (sd(eg.sim.b$EG_dens, na.rm = TRUE) / mean(eg.sim.b$EG_dens, na.rm = TRUE)^2)
 ```
 
+```{r}
+n.sim <- 1000
+p_values_df <- data.frame()
+
+for (i in 1:n.sim) {
+  # Randomly sample 110 rows from the dataframe
+  sample_data <- sample_n(eg.sim.a, 110, replace = FALSE)
+  
+  # Perform a t-test between the sample and the entire dataframe
+  t_test_result <- t.test(sample_data$EG_dens, eg.sim.a$EG_dens)
+  
+  # Store the p-value in the p_values_df dataframe
+  p_values_df <- rbind(p_values_df, data.frame(Comparison = paste("Iteration", i), P_Value = t_test_result$p.value))
+}
+
+ggplot(p_values_df) +
+  geom_histogram(aes(x = P_Value)) +
+  geom_vline(xintercept = 0.10)
+
+9/1000
+
+```
+

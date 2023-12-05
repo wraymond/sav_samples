@@ -12,9 +12,7 @@ Example data and analysis for an eelgrass analysis of a HPA permitted project. W
 
 ```{r}
 library(tidyverse)
-
 theme_set(theme_classic())
-
 set.seed(9)
 ```
 

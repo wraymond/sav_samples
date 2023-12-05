@@ -7,7 +7,7 @@ editor_options:
   chunk_output_type: console
 ---
 ## Frequentist approaches to SAV analysis
-Use frequentist statistics to compare SAV data and calcualte sample size
+Use frequentist statistics to compare SAV data and calculate sample size
 
 ```{r}
 library(tidyverse)

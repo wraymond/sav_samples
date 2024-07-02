@@ -36,47 +36,47 @@ manu.dat <- data.frame(
 )
 ```
 
-865 total survey feet, 338 have eelgrass so 39% of quads should have eelgrass for a simulation or 310 quads
+690 total survey feet, 338 have eelgrass so 48.9% of quads should have eelgrass for a simulation or 389 quads
 
 ```{r}
 dat.pre <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 310, lambda = 30), rep(0, 486)),
+  density = c(rpois(n = 389, lambda = 24), rep(0, 407)),
   time = "pre",
   site = "proj"
 )
 
 dat.post1 <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 310, lambda = 29), rep(0, 486)),
+  density = c(rpois(n = 389, lambda = 23), rep(0, 407)),
   time = "post_1",
   site = "proj"
 )
 
 dat.post3 <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 240, lambda = 28), rep(0, 556)),
+  density = c(rpois(n = 250, lambda = 28), rep(0, 546)),
   time = "post_3",
   site = "proj"
 )
 
 dat.post5 <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 240, lambda = 26), rep(0, 556)),
+  density = c(rpois(n = 250, lambda = 26), rep(0, 546)),
   time = "post_5",
   site = "proj"
 )
 
 dat.pre.ref <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 310, lambda = 30), rep(0, 486)),
+  density = c(rpois(n = 389, lambda = 24), rep(0, 407)),
   time = "pre",
   site = "ref"
 )
 
 dat.post1.ref <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 310, lambda = 32), rep(0, 486)),
+  density = c(rpois(n = 389, lambda = 23), rep(0, 407)),
   time = "post_1",
   site = "ref"
 )
@@ -90,7 +90,7 @@ dat.post3.ref <- data.frame(
 
 dat.post5.ref <- data.frame(
   quad = seq(1:796),
-  density = c(rpois(n = 290, lambda = 25), rep(0, 506)),
+  density = c(rpois(n = 340, lambda = 21), rep(0, 456)),
   time = "post_5",
   site = "ref"
 )
@@ -149,7 +149,7 @@ SSizWhitehead(0.1, 0.8, 11, (11 * 0.8), 1)
 ```{r}
 tran.dat <- data.frame(
   transect = as.character(1:7),
-  length = c(115, rep(125, 6))
+  length = c(90, rep(100, 6))
 )
 
 tran.dat$prop_tot_len <- tran.dat$length / sum(tran.dat$length)
@@ -157,16 +157,22 @@ tran.dat$prop_tot_len <- tran.dat$length / sum(tran.dat$length)
 tran.dat$tran_N <- round(tran.dat$prop_tot_len * round(sample_size, 0), 0)
 ```
 
-
 #### Option 1: Upfront mitigation
 
 ```{r}
 mean_pre <- dat.sum[[1, 3]]
 sd_pre <- dat.sum[[1, 4]]
 
-tot_area <- ((115 * 10) + (6 * 125 * 10)) / 10.764
+surv_area <- ((90 * 10) + (6 * 100 * 10)) / 10.764
+eg_area <- ( (46 * 10) +
+             (38 * 10) +
+             (34 * 10) +
+             (37 * 10) +
+             (60 * 10) +
+             (64 * 10) +
+             (59 * 10)) / 10.764
 
-tot_pre_shoots <- tot_area * mean_pre
+tot_pre_shoots <- eg_area * mean_pre
 round(tot_pre_shoots, 0)
 ```
 
@@ -179,7 +185,7 @@ ggplot(dat.sum %>%
   geom_col(aes(x = time, y = mean, fill = site)) +
   geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), width = 0) +
   scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
-  geom_hline(aes(yintercept = 11.6), color = pal[1], linetype = "dashed") +
+  geom_hline(aes(yintercept = 11.8), color = pal[1], linetype = "dashed") +
   xlab("Time") +
   ylab("Shoot density (m-sq) +/- SD") +
   theme(text = element_text(size = 12)) +
@@ -232,11 +238,11 @@ summary(mod.4)
 
 ```{r}
 ## Year 3 ##
-mean_3yr <- dat.sum[[3, 3]]
+mean_3yr <- exp(2.465 - 0.288)
 
-tot_shoots_3yr <- tot_area * mean_3yr
+eg_shoots_3yr <- eg_area * mean_3yr
 
-mit_shoots_3yr <- tot_pre_shoots - tot_shoots_3yr
+mit_shoots_3yr <- tot_pre_shoots - eg_shoots_3yr
 round(mit_shoots_3yr)
 ```
 
@@ -248,8 +254,8 @@ ggplot(dat.sum) +
   geom_col(aes(x = time, y = mean, group = site, fill = site), position = position_dodge(1)) +
   geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), position = position_dodge(1), width = 0) +
   scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
-  geom_hline(aes(yintercept = 11.6), color = pal[1], linetype = "dashed") +
-  geom_hline(aes(yintercept = 11.7), color = pal[2], linetype = "dashed") +
+  geom_hline(aes(yintercept = 11.8), color = pal[1], linetype = "dashed") +
+  geom_hline(aes(yintercept = 11.6), color = pal[2], linetype = "dashed") +
   xlab("Time") +
   ylab("Shoot density (m-sq) +/- SD") +
   theme(text = element_text(size = 12))
@@ -301,7 +307,7 @@ summary(mod.9)
 ## Year 3 ##
 mean_3yr_ref <- exp(mod.7$coefficients[[1]] - mod.7$coefficients[[4]])
 
-tot_shoots_3yr_ref <- tot_area * mean_3yr_ref
+tot_shoots_3yr_ref <- eg_area * mean_3yr_ref
 
 mit_shoots_3yr_ref <- tot_pre_shoots - tot_shoots_3yr_ref
 round(mit_shoots_3yr_ref)
@@ -333,9 +339,9 @@ summary(mod.10)
 ```{r}
 ref_adj_shoots <- exp(mod.10$coefficients[[1]] + (mod.10$coefficients[[2]] + 0.200))
 
-dens_shoots_ref_adj <-  mean_pre - ref_adj_shoots
+shoots_ref_adj <-  -(mean_pre - ref_adj_shoots * 314)
 
-mit_shoots_ref_adj <- tot_area * dens_shoots_ref_adj
+mit_shoots_ref_adj <- tot_pre_shoots - shoots_ref_adj
 round(mit_shoots_ref_adj)
 
 ## with no ref ##

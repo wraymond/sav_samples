@@ -14,28 +14,34 @@ Example data and analysis for an eelgrass analysis of a HPA permitted project. W
 library(tidyverse)
 theme_set(theme_classic())
 set.seed(9)
+
+pal <- c("#6A8026", "#3542A1")
 ```
 
 ### Data
 ```{r}
-dat <- read.csv("example_eelgrass_data.csv", header = TRUE, stringsAsFactors = FALSE)
-
-dat$time <- factor(dat$time, levels = c("pre", "one", "three", "five"))
-dat$site <- factor(dat$site, levels = c("proj", "ref"))
-
-dat.sum <- dat %>% 
-  group_by(site, time) %>% 
-  summarize(mean = mean(density),
-            sd = sd(density))
-
-pal <- c("#6A8026", "#3542A1")
-
 manu.dat <- data.frame(
   quad = seq(1:50),
   eg = c(rpois(n = 18, lambda = 30), rep(0, 32))
 )
 ```
 
+#### Load static data
+To ensure different people get the same results, load this data file. This was generated from the simulated data script below.
+```{r}
+dat <- read.csv("example_data_static_July02_2024.csv", header = TRUE, stringsAsFactors = FALSE)
+
+dat$time <- factor(dat$time, levels = c("pre", "post_1", "post_3", "post_5"))
+dat$site <- factor(dat$site, levels = c("proj", "ref"))
+
+dat.sum <- dat %>% 
+  group_by(site, time) %>% 
+  summarize(mean = mean(density),
+            sd = sd(density))
+```
+
+
+#### Simulate data
 690 total survey feet, 338 have eelgrass so 48.9% of quads should have eelgrass for a simulation or 389 quads
 
 ```{r}
@@ -107,7 +113,6 @@ dat.sum <- dat %>%
             sd = sd(density))
 ```
 
-
 ### N-star
 ```{r}
 # Known parameters
@@ -123,24 +128,7 @@ z_beta <- abs(qnorm(1 - beta))
 
 # Calculate sample size per group
 sample_size <- ((2 * (z_alpha_over_2 + z_beta)^2 * sd_pre^2) / delta^2)
-round(sample_size, 0)
-
-200*qnorm(0.1)^2 / 5
-
-2 *(qnorm(0.1) + qnorm(0.9))^2 * (10 / (10 - 8)^2)
-
-## Whitehead
-SSizWhitehead <- function(alpha, power, lambda_1, lambda_2, ratio) # estimate sample size
-{
-  tr = abs(-log(lambda_1/lambda_2))      
-  lb = (ratio * lambda_1 + lambda_2)/(ratio + 1)
-  za = qnorm(alpha)        # 1 tail
-  zb = qnorm(1 - power)
-  v = ((za + zb) / tr)^2
-  return (round(v / ratio / lb * (ratio + 1) * (ratio + 1))) # total sample size (2 groups)
-}
-
-SSizWhitehead(0.1, 0.8, 11, (11 * 0.8), 1)
+N_star <- round(sample_size, 0)
 ```
 
 ### Monitoring and mitigation
@@ -154,7 +142,7 @@ tran.dat <- data.frame(
 
 tran.dat$prop_tot_len <- tran.dat$length / sum(tran.dat$length)
 
-tran.dat$tran_N <- round(tran.dat$prop_tot_len * round(sample_size, 0), 0)
+tran.dat$tran_N <- round(tran.dat$prop_tot_len * N_star, 0)
 ```
 
 #### Option 1: Upfront mitigation
@@ -238,7 +226,7 @@ summary(mod.4)
 
 ```{r}
 ## Year 3 ##
-mean_3yr <- exp(2.465 - 0.288)
+mean_3yr <- as.numeric(exp(mod.2$coefficients[1] + mod.2$coefficients[2]))
 
 eg_shoots_3yr <- eg_area * mean_3yr
 
@@ -305,7 +293,7 @@ summary(mod.9)
 ##### Mitigation
 ```{r}
 ## Year 3 ##
-mean_3yr_ref <- exp(mod.7$coefficients[[1]] - mod.7$coefficients[[4]])
+mean_3yr_ref <- as.numeric(exp(mod.7$coefficients[[1]] - mod.7$coefficients[[4]]))
 
 tot_shoots_3yr_ref <- eg_area * mean_3yr_ref
 

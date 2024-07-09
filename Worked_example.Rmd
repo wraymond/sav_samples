@@ -127,7 +127,7 @@ z_alpha_over_2 <- qnorm(1 - alpha/2)
 z_beta <- abs(qnorm(1 - beta))
 
 # Calculate sample size per group
-sample_size <- ((2 * (z_alpha_over_2 + z_beta)^2 * sd_pre^2) / delta^2)
+sample_size <- ((z_alpha_over_2 + z_beta)^2 * 2 * sd_pre^2) / delta^2
 N_star <- round(sample_size, 0)
 ```
 

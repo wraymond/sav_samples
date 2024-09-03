@@ -317,6 +317,17 @@ dat.adj.1.sum <- dat.adj.1 %>%
   group_by(site, time) %>% 
   summarise(mean = mean(density),
             sd = sd(density))
+
+png(filename = "../Figures/worked_example_ex1.png", width = 5.5, height = 3.5, units = "in", res = 400)
+ggplot(dat.adj.1.sum) +
+  geom_col(aes(x = time, y = mean, group = site, fill = site), position = position_dodge(1)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), position = position_dodge(1), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 11.7), color = "black", linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+dev.off()
 ```
 
 ```{r}
@@ -334,5 +345,32 @@ round(mit_shoots_ref_adj)
 
 ## with no ref ##
 tot_pre_shoots - (tot_area * dat.adj.1.sum[[2, 3]])
+```
+
+#### Ex 2
+```{r}
+dat.adj.2 <- dat %>% 
+  filter(time %in% c("pre", "post_1")) 
+
+dat.adj.2[797:1107, 2] <- dat.adj.2[797:1107, 2] * 0.75
+dat.adj.2[2389:2698, 2] <- dat.adj.2[2389:2698, 2] * 0.35
+
+dat.adj.2.sum <- dat.adj.2 %>% 
+  group_by(site, time) %>% 
+  summarise(mean = mean(density),
+            sd = sd(density))
+
+ggplot(dat.adj.2.sum) +
+  geom_col(aes(x = time, y = mean, group = site, fill = site), position = position_dodge(1)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), position = position_dodge(1), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("proj", "ref"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 11.7), color = "black", linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+
+mod.11 <- glm(density ~ time/site, data = dat.adj.2, family = quasipoisson(link = "log"))
+summary(mod.11)
+
 ```
 

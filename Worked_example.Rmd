@@ -113,6 +113,33 @@ dat.sum <- dat %>%
             sd = sd(density))
 ```
 
+#### Process example data
+Manipulate static example data into template format
+
+```{r}
+## Build framework ##
+dat.ex <- data.frame(
+          survey_date = c(rep("6/24/2024", 1592), rep("6/24/2025", 1592), rep("6/24/2027", 1592), rep("6/24/2029", 1592)),
+          project_name = "Worked Example",
+          site = c(rep("project", 796), rep("reference", 796)),
+          time = c(rep("preliminary", 1592), rep("1 year post", 1592), rep("3 year post", 1592), rep("5 year post", 1592)),
+          transect = c(rep("T1", 104), rep("T2", 115), rep("T3", 115), rep("T4", 115), rep("T5", 115), rep("T6", 115), rep("T7", 117)),
+          distance_ft = c(seq(0, 90, 0.87), rep(seq(0, 100, 0.87), 5), seq(0, 100, 0.86)),
+          depth_mllw_ft = NA,
+          eg_shoots = NA,
+          bed_patch = "bed",
+          eg_density_msq = rbind(dat.pre[2], dat.pre.ref[2], dat.post1[2], dat.post1.ref[2], dat.post3[2], dat.post3.ref[2], dat.post5[2], dat.post5.ref[2]),
+          eq_PA = NA,
+          substrate = NA,
+          notes = NA
+        )
+
+dat.ex$eg_shoots <- round(dat.ex$density / 4, 0)
+
+## Export ##
+write.csv(dat.ex, "worked_exmaple_WIP.csv", row.names = FALSE)
+```
+
 ### N-star
 ```{r}
 # Known parameters

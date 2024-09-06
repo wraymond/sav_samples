@@ -22,20 +22,31 @@ pal <- c("#6A8026", "#3542A1")
 ### Load data
 Load example data set. Note that the format of this file is simplified compared to the provided data template. This is simplification is purely to streamline the example data creation. Proponents should structure their data following the template.
 
+Note that these data files hold data for all survey years, pre project, and 1, 3, and 5 years post at both a project and reference site. Proponents should analyze data after each survey. The strucure of this data is purely for illustration purposes.
+
 Note that the csv file must be in the same folder for the following code to work. Proponents may need to edit the text in the quotes depending on where they have saved the data files on their computer.
 
 ```{r}
+## Eelgrass density data ##
 dat <- read.csv("WDFW_eg_guidelines_worked_example_data.csv", header = TRUE, stringsAsFactors = FALSE)
+
+## Transect data ##
+tran <- read.csv("WDFW_eg_guidelines_worked_example_transect_data.csv", header = TRUE, stringsAsFactors = FALSE)
 ```
 
 #### Structure data
 This step is critically important for interpretation later in the process. It sets the hierarchy of time and site.
 ```{r}
+## Eelgrass density data ##
 dat$time <- factor(dat$time, levels = c("pre_project", "1_year_post", "3_year_post", "5_year_post"))
 dat$site <- factor(dat$site, levels = c("project", "reference"))
+
+## Transect data ##
+tran$time <- factor(tran$time, levels = c("pre_project", "1_year_post", "3_year_post", "5_year_post"))
+tran$site <- factor(tran$site, levels = c("project", "reference"))
 ```
 
-### Summerize data
+### Summerize data and define area
 Compute the mean and standard deviation of the data by site and year. This summary dataframe will be used for reference and making plots.
 ```{r}
 dat.sum <- dat %>% 
@@ -44,5 +55,282 @@ dat.sum <- dat %>%
             eg_sd = sd(eg_density))
 ```
 
+Compute total project area, and suitable eelgrass habitat area. These values will be used in equations later on. Where,
+
+Total project area is the total transect length X project area width as defined by the project footprint buffer. 
+
+Suitable eelgrass area is defined as the transect length from +1 feet MLLW to -40 feet MLLW or to the project boundary, which ever is shorter, X transect width 
+```{r}
+## Total project area ##
+proj.area <- 125 * 58
+proj.area.msq <- proj.area * 0.092903
+
+## Suiteable eelgrass habitat area ##
+tran.eghab <- unique(tran[, c(1:5, 7)])
+tran.eghab$tran_width_ft <- 10  
+tran.eghab$eghab_area_ftsq <- tran.eghab$eg_hab_length_ft * tran.eghab$tran_width_ft
+tran.eghab <- tran.eghab %>% 
+  group_by(site, time) %>% 
+  summarize(eg_hab_area_ftsq = sum(eghab_area_ftsq),
+            eg_hab_area_msq = eg_hab_area_ftsq * 0.092903)
+
+## Eelgrass area ##
+tran.egarea <- tran %>% 
+  mutate(eg_length_ft = eg_end_ft - eg_start_ft) %>% 
+  group_by(site, time, transect) %>% 
+  summarize(eg_length_ft = sum(eg_length_ft)) %>% 
+  ungroup() %>% 
+  mutate(tran_width_ft = 10,
+         egarea_tran = eg_length_ft * tran_width_ft) %>%
+  group_by(site, time) %>% 
+  summarize(eg_area_ftsq = sum(egarea_tran),
+            eg_are_msq = eg_area_ftsq * 0.092903)
+```
+
 ### Compute N*
-This is the 
+This calculation uses data collected from the preliminary survey. These data are not detailed in a full dataframe here. Rather, the key summary statistics are reported.
+
+```{r}
+# Known parameters
+mean_prelim <- 11
+alpha <- 0.1      # Significance level
+beta <- 0.9       # Desired power
+sd_prelim <- 15
+delta <- (0.2 * mean_prelim)  # Minimum detectable effect size (20% change)
+
+# Calculate critical values
+z_alpha_over_2 <- qnorm(1 - alpha/2)
+z_beta <- abs(qnorm(1 - beta))
+
+# Calculate sample size per group
+sample_size <- ((z_alpha_over_2 + z_beta)^2 * 2 * sd_prelim^2) / delta^2
+N_star <- round(sample_size, 0)
+```
+
+### Allocate N*
+Needed replication (N*) for advanced surveys should be allocated proportionally across transects.
+
+```{r}
+tran.rep <- unique(tran[, 1:7])
+
+tran.rep$prop_eg_length <- tran.rep$eg_hab_length_ft/ sum(tran.rep$eg_hab_length_ft)
+
+tran.rep$tran_N <- round(tran.rep$prop_eg_length * N_star, 0)
+```
+
+### Analysis
+The following sections go through the analyses shown in Appendix A separated by option.
+
+#### Option 1
+Here the proponent elects to assume total loss of eelgrass and therefore need to mitigate for all eelgrass present at the pre project survey. 
+
+```{r}
+mean_pre <- dat.sum[[1, 3]] # calls the value in the in row 1, column 3 of the dataframe dat.sum
+eg_area_pre <- tran.egarea[[1, 4]]
+
+tot_pre_shoots <- round(eg_area_pre * mean_pre, 0)
+tot_pre_shoots
+```
+
+#### Option 2
+Here the proponent elects to survey only the project site (no reference) 1,3, and 5 years post project. Therefore, after year post-project survey, we need to test for a change in eelgrass density, and if there is a change, calculate how much we have to mitigate.
+
+First, lets make a plot for visual reference. Note that all years will be plotted here in this example. However, in the real world, the proponent will conduct analyses after year survey year.
+```{r}
+ggplot(dat.sum %>% 
+         filter(site == "project")) +
+  geom_col(aes(x = time, y = eg_mean, fill = site)) +
+  geom_errorbar(aes(x = time, ymin = eg_mean - eg_sd, ymax = eg_mean + eg_sd, group = site), width = 0) +
+  scale_fill_manual(values = pal[1]) +
+  geom_hline(aes(yintercept = mean_pre), color = pal[1], linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12)) +
+  theme(legend.position = "none")
+```
+
+##### 1 year post project analysis
+
+No change detected
+```{r}
+## Specifiy data ##
+dat.1 <- dat %>% 
+  filter(site == "project") %>% 
+  filter(time %in% c("pre_project", "1_year_post"))
+
+## Specify model ##
+mod.1 <- glm(eg_density ~ time, data = dat.1, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.1)
+```
+
+##### 3 years prost project analysis
+
+Change detected. Mitigation needed.
+```{r}
+## Specifiy data ##
+dat.2 <- dat %>% 
+  filter(site == "project") %>% 
+  filter(time %in% c("pre_project", "3_year_post"))
+
+## Specify model ##
+mod.2 <- glm(eg_density ~ time, data = dat.2, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.2)
+```
+
+Calculate mitigation need.
+```{r}
+## Year 3 ##
+mean_3yr <- as.numeric(exp(mod.2$coefficients[1] + mod.2$coefficients[2]))
+eg_area_3yr <- tran.egarea[[3, 4]]
+
+eg_shoots_3yr <- eg_area_3yr * mean_3yr
+
+mitigation_shoots_3yr <- round(tot_pre_shoots - eg_shoots_3yr, 0)
+mitigation_shoots_3yr
+```
+
+##### 5 years post project analysis
+
+Change detected between pre-project and year 5.
+```{r}
+## Specifiy data ##
+dat.3 <- dat %>% 
+  filter(site == "project") %>% 
+  filter(time %in% c("pre_project", "5_year_post"))
+
+## Specify model ##
+mod.3 <- glm(eg_density ~ time, data = dat.3, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.3)
+```
+
+This is not a surprise, but we have already know what mitigation we need to so we need to figure out if any additional losses between year 3 and year 5 need to be mitigated for. For that we will run a similar analysis but comparing 3 years post project and 5 years post project.
+
+This shows no significant difference, indicating that no additional mitigation is needed.
+
+```{r}
+## Specifiy data ##
+dat.4 <- dat %>% 
+  filter(site == "project") %>% 
+  filter(time %in% c("3_year_post", "5_year_post"))
+
+## Specify model ##
+mod.4 <- glm(eg_density ~ time, data = dat.4, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.4)
+```
+
+#### Option 3
+Here the proponent elects to also sample a reference site, and is able to find a suitable one. Here, both the project and reference site will be surveyed 1, 3, and 5 years post project. Therefore, after year post-project survey, we need to test for a change in eelgrass density at the project site, and compare that to any change at the reference site. If the change at the project site is greater than the change at the reference site, within 20%, then mitigation is needed.
+
+First, lets make a plot
+```{r}
+ggplot(dat.sum) +
+  geom_col(aes(x = time, y = eg_mean, group = site, fill = site), position = position_dodge(1)) +
+  geom_errorbar(aes(x = time, ymin = eg_mean - eg_sd, max = eg_mean + eg_sd, group = site), position = position_dodge(1), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("project", "reference"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = mean_pre), color = pal[1], linetype = "dashed") +
+  geom_hline(aes(yintercept = dat.sum[[5, 3]]), color = pal[2], linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+```
+
+
+##### Compare project to reference site
+There cannot be a difference between the project and reference site pre-project. In this case there is not a difference and the project can proceed. If the project and reference site are found to have statistically significant eelgrass densites, then the reference site cannot be used.
+
+```{r}
+## Specifiy data ##
+dat.5 <- dat %>% 
+  filter(site %in% c("project", "reference")) %>% 
+  filter(time %in% c("pre_project"))
+
+## Specify model ##
+mod.5 <- glm(eg_density ~ site, data = dat.5, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.5)
+```
+
+##### 1 year post project analysis
+
+One year after the project we do not see a change in eelgrass density at the project site or between the project and the reference site. No mitigation needed 
+```{r}
+## Specifiy data ##
+dat.6 <- dat %>% 
+  filter(site %in% c("project", "reference")) %>% 
+  filter(time %in% c("pre_project", "1_year_post"))
+
+## Specify model ##
+mod.6 <- glm(eg_density ~ time/site, data = dat.6, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.6)
+```
+
+##### 3 years post project analysis
+
+Here we find that there has been a significant decrease at the project site and there the project and reference site also significantly different. Mitigation is required but can be offset by the change in the reference site.
+```{r}
+## Specifiy data ##
+dat.7 <- dat %>% 
+  filter(site %in% c("project", "reference")) %>% 
+  filter(time %in% c("pre_project", "3_year_post"))
+
+## Specify model ##
+mod.7 <- glm(eg_density ~ time/site, data = dat.7, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.7)
+```
+
+Calculate mitigation need.
+```{r}
+mean_3yr_ref <- as.numeric(exp(mod.7$coefficients[[1]] - mod.7$coefficients[[4]]))
+eg_area_3yr <- tran.egarea[[3, 4]]
+
+tot_shoots_3yr_ref <- eg_area_3yr * mean_3yr_ref
+
+mitigation_shoots_3yr_ref <- round(tot_pre_shoots - tot_shoots_3yr_ref, 0)
+mitigation_shoots_3yr_ref
+```
+
+##### 5 years port project analysis
+
+First we need to test for a change from pre-project to 5 years post. We find that there is still a change from the pre-construction density, but that the reference site has also declined substantially.
+```{r}
+## Specifiy data ##
+dat.8 <- dat %>% 
+  filter(site %in% c("project", "reference")) %>% 
+  filter(time %in% c("pre_project", "5_year_post"))
+
+## Specify model ##
+mod.8 <- glm(eg_density ~ time/site, data = dat.8, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.8)
+```
+
+Like the example in Option 2, we need to now test if there has been a significant change in eelgrass density from year 3 to year 5.
+
+Here we see that there has been little change in eelgrass density at the project site between years 3 and 5 (5 year post) and between the project and reference site in year 5 (5 year post : reference). This indicates that further mitigation is not needed. However, there is a significant difference in eelgrass density between year 3 at the project site and year 5 at the reference site (3 year:reference), indicating that the project and reference site are no longer have similar eelgrass density 
+```{r}
+## Specifiy data ##
+dat.9 <- dat %>% 
+  filter(site %in% c("project", "reference")) %>% 
+  filter(time %in% c("3_year_post", "5_year_post"))
+
+## Specify model ##
+mod.9 <- glm(eg_density ~ time/site, data = dat.9, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.9)
+```
+

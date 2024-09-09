@@ -334,3 +334,59 @@ mod.9 <- glm(eg_density ~ time/site, data = dat.9, family = quasipoisson(link = 
 summary(mod.9)
 ```
 
+#### Other Examples
+Here, we detail other examples to explore other potential scenarios. The example above has large changes in eelgrass density to help illustrate concepts and analysis, however, this may often not be the case. It may become particularly confusing in a case where there has been a similarly moderate change in both a project and reference site as described below.
+
+Data adjustment
+```{r}
+dat.adj.1 <- dat %>% 
+  filter(time %in% c("pre_project", "1_year_post")) 
+
+dat.adj.1[797:1107, 2] <- dat.adj.1[797:1107, 2] * 0.75
+dat.adj.1[2389:2698, 2] <- dat.adj.1[2389:2698, 2] * 0.75
+
+dat.adj.1.sum <- dat.adj.1 %>% 
+  group_by(site, time) %>% 
+  summarise(mean = mean(eg_density),
+            sd = sd(eg_density))
+```
+
+Plot
+```{r}
+ggplot(dat.adj.1.sum) +
+  geom_col(aes(x = time, y = mean, group = site, fill = site), position = position_dodge(1)) +
+  geom_errorbar(aes(x = time, ymin = mean - sd, ymax = mean + sd, group = site), position = position_dodge(1), width = 0) +
+  scale_fill_manual(values = pal, name = "Site", breaks = c("project", "reference"), labels = c("Project", "Reference")) +
+  geom_hline(aes(yintercept = 11.7), color = "black", linetype = "dashed") +
+  xlab("Time") +
+  ylab("Shoot density (m-sq) +/- SD") +
+  theme(text = element_text(size = 12))
+```
+
+##### Example 1
+What if there is a similar change in at the project and reference site 1 year port project?
+
+Test for differences after 1 year. Here there is a large effect of time, as in there is a decrease in eelgrass density at the project site, but the project and reference site are similar. So how much to we need to mitigate for? See full interpretation in guidelines document. 
+```{r}
+## Speficy model ##
+mod.10 <- glm(eg_density ~ time/site, data = dat.adj.1, family = quasipoisson(link = "log"))
+
+## View model fit ##
+summary(mod.10)
+```
+
+Mitigation. In this example, because there is a reference site, the first 20% of eelgrass loss can be attributed to natural variability, so the proponent only needs to mitigate for losses above that.
+```{r}
+mean_1yr.ex1 <- dat.adj.1.sum[[1, 3]]
+eg_area_1yr <- tran.egarea[[3, 4]]
+ref_adj_shoots <- exp(mod.10$coefficients[[1]] + (mod.10$coefficients[[2]] + 0.200))
+
+shoots_ref_adj <-  -(mean_1yr.ex1 - ref_adj_shoots * eg_area_1yr)
+
+mit_shoots_ref_adj <- round(tot_pre_shoots - shoots_ref_adj, 0)
+mit_shoots_ref_adj
+
+## with no reference ##
+tot_pre_shoots - (eg_area_1yr * dat.adj.1.sum[[2, 3]])
+```
+
